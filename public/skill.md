@@ -157,17 +157,47 @@ source (https://wedgie.dev/wedgie.py) is the reference if you must.
 
 ## No serial port? Files on the WEDGIE drive (0.3.22+)
 
-A host that can't open the serial port (an iPhone, a locked-down computer) can talk through the drive.
-The drive is read-only until **phone mode** (0.3.37+): read the hidden `PHONE.TXT` twice, 1-10 s apart (not
-in the first 8 s after plug-in), uncached. The wedgie asks "Allow phone txns?"; after the green button the drive
-reconnects writable and a phone shows in the screen's corner, until unplug (a Mac never sees a writable
-drive, so it never says "not ejected properly"). Then write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
-a new name every time. The wedgie reads it 0.7 s after the last write; anything that needs a yes still
-asks on its screen. Once a request came in as a file, every answer is also written to `ANSWER.TXT`
-(2048 bytes): the first line is `#<count>`, then the answers as JSON lines, padded with newlines. Read it
-uncached until the count moves (a few seconds; up to a minute when it waits for an A press), and delete
-old REQ files. Writes live in the wedgie's RAM (a few KB) and are gone at unplug; flash is never written.
-The iPhone app (ios/WedgieDrive in the repo) works this way.
+A host that can't open the serial port (an iPhone, a locked-down computer) can send the same requests as
+files on the drive. It's a new way in for requests, not more power: anything that needs a yes still asks on
+the wedgie's screen.
+
+**Allow phone txns (0.3.37+).** The drive is read-only until the person allows it. To ask: read the hidden
+`PHONE.TXT` twice, 1-10 s apart, uncached, not in the first 8 s after plug-in (the wedgie ignores reads then).
+One ask at a time (two overlapping can ask twice). The wedgie asks "Allow phone txns?". After the green
+button it drops off USB for 2 s and comes back writable, with a phone in the screen's corner, until unplug. A
+no restarts it (the drive drops and comes back read-only). A Mac never sees a writable drive, so it never
+says "not ejected properly".
+
+**Send.** Write a new file `REQ-<n>.TXT` in the top folder: one JSON request per line with your own unique
+`id`, a new name every time. The wedgie reads it 0.7 s after the last write.
+
+**Answer.** Once a request came in as a file, every answer also goes into `ANSWER.TXT` (2048 bytes): first
+line `#<count>`, then the last few answers as JSON lines, padded with newlines (strip `\0`). It starts over
+when full. Read it uncached about every 0.7 s until an answer with your `id` is there (a few seconds; up to a
+minute while it waits for a press).
+
+**The wedgie keeps your writes in 12 sectors of RAM (6 KB, folder and FAT writes included), never flash.** It
+frees a deleted file's sectors only once the FAT says free and 2 s after they were written. So:
+- one request at a time, the next only after the last one's answer;
+- delete every old REQ file just before writing the next (also a half-written one from a failed write);
+- keep a line under about 1.6 KB, and at least 2.2 s from one write to the next;
+- a write that fails with an I/O error means full: wait a second and try again;
+- a big request goes in pieces if its app takes them (the Safe signer: `safe_data`, 1400 hex a piece over
+  the drive, then `safe_sign` with `data: "@"`).
+
+**On an iPhone** (reference: ios/WedgieDrive in this repo, and Instant Wallet's app, `Drive.swift`):
+- Pick the drive once with the folder picker (`UIDocumentPickerViewController(forOpeningContentTypes:
+  [.folder])`) and keep a security-scoped bookmark. It survives unplug. The first time the picker opens
+  wherever the person last was (Recents, iCloud): tell them Browse, WEDGIE, Open. It can't be started on the
+  drive before the app has been given it once (`directoryURL` to its path is ignored).
+- Check the pick: the drive has `README.txt` and `SKILL.md` at its top.
+- `volumeIsReadOnly` says whether phone txns are allowed yet. iOS has no plug-in event: poll about once a
+  second while the app is in front.
+- Read uncached (`NSFileCoordinator` `.withoutChanges` + `Data(contentsOf:options: .uncached)`) or iOS hands
+  back its old copy. Plain writes; the drive doesn't do `fsync` (`FileHandle.synchronize` fails).
+- Every drive call off the main thread, with a time limit, and never at app start: a stuck drive can hang a
+  call for good.
+- On a Mac, ask by reading `/Volumes/WEDGIE/PHONE.TXT` twice with `F_NOCACHE`.
 
 ## The hardware: parts, pinout, putting it together
 
