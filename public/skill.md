@@ -203,6 +203,44 @@ delete reached it and 2 s had passed. So:
   call for good.
 - On a Mac, ask by reading `/Volumes/WEDGIE/KNOCKB.TXT`, `KNOCKA.TXT`, `KNOCKB.TXT` with `F_NOCACHE`, 0.5 s apart.
 
+**Rules for an agent:**
+- The knock is the only way to make the drive writable. Don't look for another (no SCSI tricks, no
+  firmware edits); a writable drive by default makes every Mac warn at unplug.
+- A computer that knocks gets a writable drive, so its person sees "not ejected properly" unless they eject
+  first. Tell them. On a computer, USB serial is the better path; the drive is for hosts without one.
+- Writable never means more power: every request still goes through the same handler as serial, and anything
+  that signs or installs still needs the green button on the wedgie.
+- Reads must reach the wedgie: uncached, and never two reads of the same file within 0.3 s (they count as one).
+
+**Sketch (Python on a Mac; not run against a board):**
+
+    import fcntl, os, time, json
+    V = "/Volumes/WEDGIE"
+    def raw(name):                                    # uncached: the wedgie must see the read
+        fd = os.open(os.path.join(V, name), os.O_RDONLY)
+        try:
+            fcntl.fcntl(fd, getattr(fcntl, "F_NOCACHE", 48), 1)
+            return os.read(fd, 4096)
+        finally:
+            os.close(fd)
+    def writable():
+        try: return not os.statvfs(V).f_flag & os.ST_RDONLY
+        except OSError: return False                  # gone for its 2 s drop
+    while not writable():                             # the knock, again until it takes
+        try:
+            for f in ("KNOCKB.TXT", "KNOCKA.TXT", "KNOCKB.TXT"):
+                raw(f); time.sleep(0.5)
+        except OSError: pass
+        time.sleep(2)
+    rid = int(time.time())
+    with open(os.path.join(V, "REQ-%d.TXT" % rid), "w") as f:
+        f.write(json.dumps({"id": rid, "type": "hello"}) + "\n")
+    for _ in range(30):                               # the answer: match by id
+        time.sleep(0.7)
+        for line in raw("ANSWER.TXT").decode(errors="ignore").replace("\0", "").splitlines():
+            if line.startswith("{") and json.loads(line).get("id") == rid:
+                print(line); raise SystemExit
+
 ## The hardware: parts, pinout, putting it together
 
 Be exact when someone builds or rebuilds one: **a wire in the wrong hole is the most common failure.**
