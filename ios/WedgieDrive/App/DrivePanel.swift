@@ -64,7 +64,7 @@ struct DrivePanel: View {
                 case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
                 case .here:
                     if !drive.readOnly { PillButton(title: "Done") { dismiss() } }
-                    else { PillButton(title: drive.knocked == nil ? "Let this phone in" : "Ask again") { Task { await drive.knock() } } }
+                    else { PillButton(title: drive.knocked == nil ? "Allow phone txns" : "Ask again") { Task { await drive.knock() } } }
                 case .away: EmptyView()
                 }
                 Button("Details") { details = true }
@@ -81,7 +81,7 @@ struct DrivePanel: View {
         switch drive.state {
         case .unpicked: return drive.wrongPick == nil ? "Find your wedgie" : "That's not your wedgie"
         case .away: return drive.knocked != nil ? "Connecting" : "Plug in your wedgie"
-        case .here: return drive.readOnly ? (drive.knocked == nil ? "Let this phone in" : "Press green") : "Connected"
+        case .here: return drive.readOnly ? (drive.knocked == nil ? "Allow phone txns" : "Press green") : "Connected"
         }
     }
 
@@ -291,7 +291,7 @@ struct PickerHint: View {
     }
 }
 
-/// After "Let this phone in": a green bar that keeps creeping (slower near the end) until it's connected.
+/// After "Allow phone txns": a green bar that keeps creeping (slower near the end) until it's connected.
 struct WaitBar: View {
     @State private var start = Date()
     var body: some View {
