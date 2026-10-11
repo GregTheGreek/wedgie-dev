@@ -241,16 +241,19 @@ over = len(d.over)
 G.send({"id": 1, "type": "pong"})
 a = answer_txt()
 check("an answer lands in ANSWER.TXT: count line, then it, then newlines: " + repr(a[:40]),
-      a.split(b"\n")[:2] == [b"#00000001", b'{"id": 1, "type": "pong"}'] and a.strip(b"\n").count(b"\n") == 1 and len(a) == 2048)
+      a.split(b"\n")[0][:9] == b"#00000001" and a.split(b"\n")[1] == b'{"id": 1, "type": "pong"}' and a.strip(b"\n").count(b"\n") == 1 and len(a) == 2048)
+head = a.split(b"\n")[0]
+check("the first line also says the drive's state (writes, scans, RAM): " + repr(head.strip()),
+      len(head) == 63 and b" w" in head and b" s" in head and b" o" in head and b" f" in head)
 G.send({"id": 2, "type": "ok"})
 a = answer_txt()
-check("answers stack up, oldest first", a.split(b"\n")[:3] == [b"#00000002", b'{"id": 1, "type": "pong"}', b'{"id": 2, "type": "ok"}'])
+check("answers stack up, oldest first", a.split(b"\n")[0][:9] == b"#00000002" and a.split(b"\n")[1:3] == [b'{"id": 1, "type": "pong"}', b'{"id": 2, "type": "ok"}'])
 for i in range(40):
     G.send({"id": 100 + i, "type": "ok", "pad": "x" * 60})
 a = answer_txt()
 got = [l for l in a.split(b"\n") if l]
 check("a full ANSWER.TXT starts over, the newest answer kept: %d lines" % len(got),
-      got[0] == b"#00000042" and got[-1].startswith(b'{"id": 139,') and len(a) == 2048)
+      got[0][:9] == b"#00000042" and got[-1].startswith(b'{"id": 139,') and len(a) == 2048)
 G.send({"id": 3, "type": "big", "pad": "y" * 3000})
 check("an answer too long for the file says so", b"too long" in answer_txt())
 check("answers take no write RAM", len(d.over) == over)

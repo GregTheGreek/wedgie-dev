@@ -24,7 +24,10 @@ fed = False             # a request came in through a file: answers go to ANSWER
 _ans = None             # bytearray: ANSWER.TXT as the host reads it (made at the first answer)
 _end = 0                # where the answer lines stop in it
 _count = 0
-_HEAD = 10              # its first line, b"#00000007\n": how many answers so far, so a host sees a new one
+_HEAD = 64              # its first line: b"#00000007" (how many answers so far, so a host sees a new one), then
+                        # the drive's state, padded to 63 + "\n" (stat): what reached the wedgie, for a phone
+_stat_at = 0
+scans = 0
 
 
 def _geometry(dr):
@@ -131,15 +134,34 @@ def answer(s):
     _ans[_end:_end + len(b)] = b
     _end += len(b) + 1
     _count += 1
-    _ans[0:_HEAD - 1] = ("#%08d" % _count).encode()
+    _ans[0:9] = ("#%08d" % _count).encode()
+    stat(dr, True)
+
+
+def stat(dr, now=False):
+    """The rest of ANSWER.TXT's first line, at most every 500 ms: w writes taken, a ms since the last, l its lba,
+    p 1 = written since the last scan (waiting for SETTLE ms of quiet), o RAM sectors held, f 1 = RAM full,
+    s scans, q files waiting. A phone reads it uncached: did its request reach the wedgie, and why no answer."""
+    global _stat_at
+    t = ticks_ms()
+    if _ans is None or not (now or ticks_diff(t, _stat_at) >= 500):
+        return
+    _stat_at = t
+    a = min(ticks_diff(t, dr.lastw), 99999) if dr.lastw else -1
+    line = (" w%d a%d l%d p%d o%d f%d s%d q%d" % (dr.nw, a, dr.lastlba, 1 if dr.wrote else 0, len(dr.over),
+                                                 1 if dr.full else 0, scans, len(todo))).encode()[:_HEAD - 10]
+    _ans[9:_HEAD - 1] = line + b" " * (_HEAD - 10 - len(line))
 
 
 def _pump(dr, R):
     global cur, _buf
     if _buf is None:
         _buf = bytearray(512)
+    global scans
+    stat(dr)
     if dr.wrote and ticks_diff(ticks_ms(), dr.wrote) >= SETTLE:
         dr.wrote = 0
+        scans += 1
         _scan(dr)
     while True:
         if cur is None:

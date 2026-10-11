@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.41.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.42.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.41","fw":"wedgie-0.3.41","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.42","fw":"wedgie-0.3.42","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -174,9 +174,15 @@ A then B milliseconds apart, so it never asks by accident.) Firmware 0.3.37-0.3.
 `id`, a new name every time. The wedgie reads it 0.7 s after the last write.
 
 **Answer.** Once a request came in as a file, every answer also goes into `ANSWER.TXT` (2048 bytes): first
-line `#<count>`, then the last few answers as JSON lines, padded with newlines (strip `\0`). It starts over
+line `#<count>` (0.3.42+: then the drive's state, below), then the last few answers as JSON lines, padded with newlines (strip `\0`). It starts over
 when full. Read it uncached about every 0.7 s until an answer with your `id` is there (a few seconds; up to a
 minute while it waits for a press).
+
+**What reached the wedgie (0.3.42+).** The rest of `ANSWER.TXT`'s first line, refreshed every 0.5 s, read it
+uncached: `w` writes taken, `a` ms since the last, `l` its sector, `p1` written since the last look (it reads
+new files only after 0.7 s with no writes), `o` RAM sectors held, `f1` RAM full, `s` looks, `q` files waiting.
+No answer and `w` didn't move: your write never reached it. `p1` with a small `a` that stays small: something
+keeps writing, so it never looks. `f1`: full.
 
 **The wedgie keeps your writes in 12 sectors of RAM (6 KB, folder and FAT writes included), never flash.**
 0.3.41+ gives a request's sectors back as soon as it has read the file. Before that, only once the host's

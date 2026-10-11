@@ -92,6 +92,9 @@ class Drive(usbdev.Interface):
         self.when = {}                  # lba -> ticks_ms it was last written (for _reclaim)
         self.base = None                # a sector of the image, to compare a write with (made at the first)
         self.wrote = 0                  # ticks_ms of the last write; 0: nothing new for inbox.py
+        self.nw = 0                     # writes taken, the last one's lba and ticks_ms: inbox.py shows them in
+        self.lastlba = -1               # ANSWER.TXT's first line, so a phone can see what reached the wedgie
+        self.lastw = 0
         self.full = False
         self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
         self.writable = False           # phone mode (phone()): the host may write
@@ -360,6 +363,8 @@ class Drive(usbdev.Interface):
         else:
             self.full = True
         self.wrote = ticks_ms() or 1
+        self.nw += 1
+        self.lastlba, self.lastw = lba, self.wrote
         if lba in self.over:
             self.when[lba] = self.wrote
         self._next_write()
