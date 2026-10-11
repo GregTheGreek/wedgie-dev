@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.42.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.43.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.42","fw":"wedgie-0.3.42","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.43","fw":"wedgie-0.3.43","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -180,7 +180,8 @@ minute while it waits for a press).
 
 **What reached the wedgie (0.3.42+).** The rest of `ANSWER.TXT`'s first line, refreshed every 0.5 s, read it
 uncached: `w` writes taken, `a` ms since the last, `l` its sector, `p1` written since the last look (it reads
-new files only after 0.7 s with no writes), `o` RAM sectors held, `f1` RAM full, `s` looks, `q` files waiting.
+new files only after 0.7 s with no writes), `o` RAM sectors held, `f1` RAM full, `s` looks, `z` writes by area
+(boot.FATs.root folder.data, 0.3.43+), `e` root folder entries used/deleted/of (the root folder holds only 64).
 No answer and `w` didn't move: your write never reached it. `p1` with a small `a` that stays small: something
 keeps writing, so it never looks. `f1`: full.
 

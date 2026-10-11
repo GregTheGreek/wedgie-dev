@@ -141,15 +141,26 @@ def answer(s):
 def stat(dr, now=False):
     """The rest of ANSWER.TXT's first line, at most every 500 ms: w writes taken, a ms since the last, l its lba,
     p 1 = written since the last scan (waiting for SETTLE ms of quiet), o RAM sectors held, f 1 = RAM full,
-    s scans, q files waiting. A phone reads it uncached: did its request reach the wedgie, and why no answer."""
+    s scans, z writes by area (boot.FATs.root folder.data), e root folder entries used/deleted/of. A phone
+    reads it uncached: did its request reach the wedgie, and why no answer."""
     global _stat_at
     t = ticks_ms()
-    if _ans is None or not (now or ticks_diff(t, _stat_at) >= 500):
+    if _ans is None or _buf is None or not (now or ticks_diff(t, _stat_at) >= 500):
         return
     _stat_at = t
     a = min(ticks_diff(t, dr.lastw), 99999) if dr.lastw else -1
-    line = (" w%d a%d l%d p%d o%d f%d s%d q%d" % (dr.nw, a, dr.lastlba, 1 if dr.wrote else 0, len(dr.over),
-                                                 1 if dr.full else 0, scans, len(todo))).encode()[:_HEAD - 10]
+    fat0, root0, nroot, data0, spc = _geometry(dr)
+    used = gone = 0
+    for sct in range(root0, root0 + nroot):
+        b = dr.sector(sct, _buf)
+        for o in range(0, 512, 32):
+            if b[o] == 0xE5:
+                gone += 1
+            elif b[o]:
+                used += 1
+    z = dr.nwz
+    line = (" w%d a%d l%d p%d o%d f%d s%d z%d.%d.%d.%d e%d/%d/%d" % (dr.nw, a, dr.lastlba, 1 if dr.wrote else 0,
+            len(dr.over), 1 if dr.full else 0, scans, z[0], z[1], z[2], z[3], used, gone, nroot * 16)).encode()[:_HEAD - 10]
     _ans[9:_HEAD - 1] = line + b" " * (_HEAD - 10 - len(line))
 
 

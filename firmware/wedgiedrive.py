@@ -95,9 +95,11 @@ class Drive(usbdev.Interface):
         self.nw = 0                     # writes taken, the last one's lba and ticks_ms: inbox.py shows them in
         self.lastlba = -1               # ANSWER.TXT's first line, so a phone can see what reached the wedgie
         self.lastw = 0
+        self.nwz = [0, 0, 0, 0]         # writes by area: boot sector, FATs, root folder, data (for that line too)
         self.full = False
         self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
         self.writable = False           # phone mode (phone()): the host may write
+        self._geo = None                # (root folder's first sector, data's first sector), from the boot sector
         self.knock_a = self._find(b"KNOCKA  TXT")    # first sectors of the knock files (-1: none)
         self.knock_b = self._find(b"KNOCKB  TXT")
         self.ks = 0                     # how far into B, A, B (0: nothing yet)
@@ -119,6 +121,13 @@ class Drive(usbdev.Interface):
                 if b[o:o + 11] == name:
                     return data0 + (struct.unpack_from("<H", b, o + 26)[0] - 2) * spc
         return -1
+
+    def _geometry(self):
+        b = self.img.read(0, bytearray(_SECTOR))
+        spc, res, nfats, nroot, _, _, fsz = struct.unpack_from("<BHBHHBH", b, 13)
+        root0 = res + nfats * fsz
+        self._geo = (root0, root0 + nroot * 32 // _SECTOR)
+        return self._geo
 
     def _knock(self, b):
         """A read of KNOCKB (b) or KNOCKA (not b). B, A, B, each step STEP_MIN-STEP_MAX apart, knocks."""
@@ -365,6 +374,8 @@ class Drive(usbdev.Interface):
         self.wrote = ticks_ms() or 1
         self.nw += 1
         self.lastlba, self.lastw = lba, self.wrote
+        g = self._geo or self._geometry()
+        self.nwz[0 if lba == 0 else 1 if lba < g[0] else 2 if lba < g[1] else 3] += 1
         if lba in self.over:
             self.when[lba] = self.wrote
         self._next_write()
