@@ -298,8 +298,13 @@ enum DriveError: LocalizedError {
     func knock() async {
         knocked = Date()
         note(.info, "knock: press green on the wedgie")
+        // 0.3.41+: KNOCKB, KNOCKA, KNOCKB 0.5 s apart turns it writable, no question. 0.3.37-0.3.40: PHONE.TXT twice
+        // 1.2 s+ apart (the first and last reads here), then a green press.
         _ = try? await io.read("PHONE.TXT")
-        try? await Task.sleep(for: .milliseconds(1200))
+        for f in ["KNOCKB.TXT", "KNOCKA.TXT", "KNOCKB.TXT"] {
+            try? await Task.sleep(for: .milliseconds(500))
+            _ = try? await io.read(f)
+        }
         _ = try? await io.read("PHONE.TXT")
     }
 
