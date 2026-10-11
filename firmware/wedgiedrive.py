@@ -98,6 +98,7 @@ class Drive(usbdev.Interface):
         self.nwz = [0, 0, 0, 0]         # writes by area: boot sector, FATs, root folder, data (for that line too)
         self.full = False
         self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
+        self.ans_t = -1                 # where its first sector takes the clock at every read (inbox._T), -1: no
         self.writable = False           # phone mode (phone()): the host may write
         self._geo = None                # (root folder's first sector, data's first sector), from the boot sector
         self.knock_a = self._find(b"KNOCKA  TXT")    # first sectors of the knock files (-1: none)
@@ -162,11 +163,29 @@ class Drive(usbdev.Interface):
         except Exception as e:
             print("drive:", e)
 
+    def remount(self):
+        """The host's view is stale (an iPhone served a cached ANSWER.TXT for minutes, 10-11): USB off and on, so it
+        mounts the drive again with nothing cached. Stays writable; what it wrote stays (RAM, until unplug)."""
+        if not self.writable:
+            return False
+        try:
+            from time import sleep_ms
+            u = usbdev.get()
+            u.active(False)
+            sleep_ms(2000)                  # as phone(): shorter and an iPhone may keep its old mount
+            u.active(True)
+        except Exception as e:
+            print("drive:", e)
+        return True
+
     def sector(self, lba, buf):
         """Sector lba as the host sees it: ANSWER.TXT from RAM, what it wrote, else the image (read into buf)."""
         a = self.ans
         if a is not None and a[0] <= lba < a[1]:
-            return a[2][lba - a[0]]
+            m = a[2][lba - a[0]]
+            if lba == a[0] and self.ans_t >= 0:     # this read's time: a host that sees the same t twice has a cached copy
+                m[self.ans_t:self.ans_t + 12] = (" t%010d" % ticks_ms()).encode()
+            return m
         b = self.over.get(lba)
         if b is not None:
             return b

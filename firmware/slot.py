@@ -248,6 +248,13 @@ def _handle(m):
         dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
         if dr is not None:              # no question (0.3.41): files can't do more than USB serial, which never
             dr.phone()                  # asks; anything that signs still asks for the green button
+    elif t == "remount":                # the host's view of the drive is stale (cached): USB off and on, no question
+        dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
+        ok = dr is not None and dr.writable
+        W.send({"id": mid, "type": "remount"} if ok else {"id": mid, "type": "error", "error": "not in phone mode"})
+        if ok:
+            time.sleep_ms(300)          # the answer gets out on USB serial first
+            dr.remount()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
         try:
             if _asking(lambda: _job(mid, m)):

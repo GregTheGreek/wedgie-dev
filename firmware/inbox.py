@@ -24,8 +24,11 @@ fed = False             # a request came in through a file: answers go to ANSWER
 _ans = None             # bytearray: ANSWER.TXT as the host reads it (made at the first answer)
 _end = 0                # where the answer lines stop in it
 _count = 0
-_HEAD = 64              # its first line: b"#00000007" (how many answers so far, so a host sees a new one), then
-                        # the drive's state, padded to 63 + "\n" (stat): what reached the wedgie, for a phone
+_HEAD = 80              # its first line: b"#00000007" (how many answers so far, so a host sees a new one), then
+                        # the drive's state (stat): what reached the wedgie, for a phone; then " t" + the wedgie's
+                        # clock in ms, stamped at every read of the sector (0.3.45, wedgiedrive.sector): two reads
+                        # with the same t didn't both reach the wedgie (a host's cached copy); then "\n"
+_T = _HEAD - 13         # where " t%010d" goes
 _stat_at = 0
 scans = 0
 
@@ -125,6 +128,7 @@ def answer(s):
         _fill(0)
         mv = memoryview(_ans)
         dr.ans = (f[0], f[0] + f[1], [mv[i * 512:(i + 1) * 512] for i in range(f[1])])
+        dr.ans_t = _T
     b = s.encode()
     if len(b) + 1 > len(_ans) - _HEAD:
         b = b'{"type":"error","error":"answer too long for ANSWER.TXT"}'
@@ -160,8 +164,8 @@ def stat(dr, now=False):
                 used += 1
     z = dr.nwz
     line = (" w%d a%d l%d p%d o%d f%d s%d z%d.%d.%d.%d e%d/%d/%d" % (dr.nw, a, dr.lastlba, 1 if dr.wrote else 0,
-            len(dr.over), 1 if dr.full else 0, scans, z[0], z[1], z[2], z[3], used, gone, nroot * 16)).encode()[:_HEAD - 10]
-    _ans[9:_HEAD - 1] = line + b" " * (_HEAD - 10 - len(line))
+            len(dr.over), 1 if dr.full else 0, scans, z[0], z[1], z[2], z[3], used, gone, nroot * 16)).encode()[:_T - 9]
+    _ans[9:_T] = line + b" " * (_T - 9 - len(line))
 
 
 def _pump(dr, R):

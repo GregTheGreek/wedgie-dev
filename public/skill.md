@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.44.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.45.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.44","fw":"wedgie-0.3.44","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.45","fw":"wedgie-0.3.45","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -143,6 +143,8 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
     {"id":10,"type":"open","for":"..."}  -> {"type":"open"} or {"type":"refused"}  (asks the person, in red)
     {"id":11,"type":"open","full":true}  -> the same, asked in red: full control
     {"type":"phone"}                     -> makes the WEDGIE drive writable (phone mode), no question
+    {"id":13,"type":"remount"}           -> {"type":"remount"}, then USB off for 2 s and back, still writable
+                                            (phone mode only, 0.3.45+: a host whose view of the drive is stale)
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
@@ -187,6 +189,11 @@ new files only after 0.7 s with no writes), `o` RAM sectors held, `f1` RAM full,
 (boot.FATs.root folder.data, 0.3.43+), `e` root folder entries used/deleted/of (the root folder holds only 64).
 No answer and `w` didn't move: your write never reached it. `p1` with a small `a` that stays small: something
 keeps writing, so it never looks. `f1`: full.
+
+**Is what you read real (0.3.45+)?** The first line ends with ` t` and the wedgie's clock in ms, stamped at
+every read of that sector. Read it twice: the same `t` means the second read never reached the wedgie (your
+host served a cached copy). Then write a `{"type":"remount"}` request (writes still get through): the drive
+drops off USB for 2 s and your host mounts it again with nothing cached; the answer is there after.
 
 **The wedgie keeps your writes in 12 sectors of RAM (6 KB, folder and FAT writes included), never flash.**
 0.3.41+ gives a request's sectors back as soon as it has read the file. Before that, only once the host's

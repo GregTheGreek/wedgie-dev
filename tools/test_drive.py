@@ -247,7 +247,15 @@ check("an answer lands in ANSWER.TXT: count line, then it, then newlines: " + re
       a.split(b"\n")[0][:9] == b"#00000001" and a.split(b"\n")[1] == b'{"id": 1, "type": "pong"}' and a.strip(b"\n").count(b"\n") == 1 and len(a) == 2048)
 head = a.split(b"\n")[0]
 check("the first line also says the drive's state (writes, scans, RAM): " + repr(head.strip()),
-      len(head) == 63 and b" w" in head and b" s" in head and b" o" in head and b" f" in head)
+      len(head) == 79 and b" w" in head and b" s" in head and b" o" in head and b" f" in head)
+import re, time as _time
+t1 = re.search(rb" t(\d{10})$", head)
+_time.sleep(0.01)
+t2 = re.search(rb" t(\d{10})$", answer_txt().split(b"\n")[0])
+check("the first line ends with the wedgie's clock, stamped at each read (two reads, two times): %r %r"
+      % (t1 and t1.group(1), t2 and t2.group(1)), t1 and t2 and t2.group(1) > t1.group(1))
+replugs.clear()
+check("remount(): USB off and on, still writable", d.remount() and replugs == [(False,), (True,)] and d.writable)
 G.send({"id": 2, "type": "ok"})
 a = answer_txt()
 check("answers stack up, oldest first", a.split(b"\n")[0][:9] == b"#00000002" and a.split(b"\n")[1:3] == [b'{"id": 1, "type": "pong"}', b'{"id": 2, "type": "ok"}'])
