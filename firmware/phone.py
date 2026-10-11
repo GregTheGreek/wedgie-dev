@@ -7,7 +7,7 @@ import ui
 
 def ask():
     """True after a yes (the green button). After it, a short screen saying so: the app draws over it."""
-    ok = ui.ask(slot.d, "Let in", ms=slot.ASK_MS, big="phone")
+    ok = ui.ask(slot.d, "Allow", ms=slot.ASK_MS, big="phone txns")   # a new way in for transactions, not access (Austin)
     if ok:
-        ui.page(slot.d, "Phone in")
+        ui.page(slot.d, "Phone txns on")
     return ok
