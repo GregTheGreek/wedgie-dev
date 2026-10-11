@@ -59,8 +59,9 @@ def soft_reset():
     time.sleep_ms(25)
 
 
-def wait_response(timeout_ms=1000):
-    """Poll I2C_STATE until RESP_RDY; return the response length."""
+def wait_response(timeout_ms=10000):
+    """Poll I2C_STATE until RESP_RDY; return the response length. 10 s: a factory-key sign took over 1 s
+    on a real board (2026-10-11, the chip check failed with state 88800000, busy)."""
     t = time.ticks_ms()
     while True:
         s = state()
