@@ -80,11 +80,11 @@ money. A desktop never says "Disk Not Ejected Properly". As few waits and prompt
 
 ## Steps
 
-1. Firmware 0.3.40: B-A-B trigger, no question, no 8 s window, RAM freed on read, shortest working drop.
+1. Firmware 0.3.41: B-A-B trigger, no question, no 8 s window, RAM freed on read, shortest working drop.
    test_drive: B-A-B turns writable; A-B, A-B-A-B in folder order, a full scan, and cached repeats don't.
    Parser fuzz in the gate. skill.md + the drive's SKILL.md. Sign.
 2. Real boards: Mac (10 plug-ins, Finder browsing, Quick Look: never writable, no warning), Windows
    (Defender scan: never writable), iPhone (connects with no tap; a big transaction streams).
 3. Instant Wallet app + site, wedgie app + /safe: B-A-B, auto-connect, old knock as a fallback, no panel
-   for connecting, pieces without the 2.2 s gap on 0.3.40+ (hello's `version`).
+   for connecting, pieces without the 2.2 s gap on 0.3.41+ (hello's `version`).
 4. Measure plug-in to connected, and a big transaction's time. Write the numbers here.

@@ -109,29 +109,40 @@ def sense():
     data, _ = command(b"\x03\x00\x00\x00\x12\x00", 18)
     return data[2] & 15, data[12]
 
-# ---- read-only until phone mode (0.3.37): a write fails and changes nothing; a knock on PHONE.TXT;
-# phone() (after a yes) makes it writable and replugs USB, so the host mounts it again ---------------
+# ---- read-only until phone mode (0.3.37): a write fails and changes nothing; the knock (0.3.41: read
+# KNOCKB, KNOCKA, KNOCKB within 3 s); phone() makes it writable and replugs USB, so the host mounts it again --
 check("read-only: a write fails", write(40, b"x" * 512) == 1)
 check("read-only: write protected (7/27)", sense() == (7, 0x27))
 data, st = command(b"\x28\x00" + struct.pack(">I", 40) + b"\x00\x00\x01\x00", 512)
 check("read-only: the sector is unchanged", st == 0 and data == IMG[40 * 512:41 * 512] and not d.over)
-# the knock: PHONE.TXT read twice, 0.7-10 s apart, after the first 8 s (a Mac reads everything when it mounts)
 now = [10 ** 6]
 real_ticks = W.ticks_ms
 W.ticks_ms = lambda: now[0]
-d.born = now[0]
-def read_phone():
-    command(b"\x28\x00" + struct.pack(">I", d.knock_at) + b"\x00\x00\x01\x00", 512)
-check("PHONE.TXT is on the drive", d.knock_at > 0)
-read_phone(); now[0] += 1000; read_phone()
-check("knock: not in the first 8 s", not d.knocked)
-now[0] += 9000; read_phone(); now[0] += 100; read_phone()
-check("knock: one read twice in 0.1 s is one knock", not d.knocked)
-now[0] += 1000; read_phone()
-check("knock: two reads 1 s apart knock", d.knocked)
-d.knocked = False
-now[0] += 20000; read_phone(); now[0] += 15000; read_phone()
-check("knock: 15 s apart is two first knocks", not d.knocked)
+def rd(lba, n=1):
+    command(b"\x28\x00" + struct.pack(">I", lba) + b"\x00\x00" + bytes([n]) + b"\x00", n * 512)
+A, B = d.knock_a, d.knock_b
+def seq(*parts):
+    """Reads: "A"/"B" one file, "AB" one read over both, a number = ms to wait. Did it knock?"""
+    d.knocked, d.ks = False, 0
+    now[0] += 60000
+    for p in parts:
+        if isinstance(p, int):
+            now[0] += p
+        elif p == "AB":
+            rd(min(A, B), abs(B - A) + 1)
+        else:
+            rd(A if p == "A" else B)
+    return d.knocked
+check("KNOCKA.TXT before KNOCKB.TXT on the drive", 0 < A < B)
+check("knock: B, A, B 0.5 s apart knocks (right after plug-in too)", seq("B", 500, "A", 500, "B"))
+check("knock: read twice per open (B B, A A, B B) still knocks", seq("B", 40, "B", 500, "A", 40, "A", 500, "B", 40, "B"))
+check("knock: A, B (a scan, folder order) doesn't", not seq("A", 5, "B"))
+check("knock: scan after scan (A B, A B, A B) doesn't", not seq("A", 5, "B", 600, "A", 5, "B", 600, "A", 5, "B"))
+check("knock: one read over both, again and again, doesn't", not seq("AB", 500, "AB", 500, "AB"))
+check("knock: B, A, B too fast (0.1 s) doesn't", not seq("B", 100, "A", 100, "B"))
+check("knock: a step over 3 s doesn't", not seq("B", 500, "A", 3500, "B"))
+check("knock: B, B (1 s), A, B knocks (a B starts it over)", seq("B", 1000, "B", 500, "A", 500, "B"))
+check("knock: B, A, A (1 s), B doesn't", not seq("B", 500, "A", 1000, "A", 500, "B"))
 W.ticks_ms = real_ticks
 replugs = []
 W.usbdev.get = lambda: types.SimpleNamespace(active=lambda *v: replugs.append(v))
@@ -280,5 +291,21 @@ for i in range(3 * W._CAP):
         print("  request", i, "write status", st, "read", got, "RAM sectors", sorted(d.over))
         break
 check("%d requests in a row, each deleted after (RAM sectors at the end: %d, reclaims: %d)" % (3 * W._CAP, len(d.over), calls[0]), ok)
+
+# ---- an iPhone holds its deletes: requests never deleted, up to 3 sectors each, still fit (0.3.41: a file
+# read whole gives its sectors back at once) -------------------------------------------------------------
+img.write_bytes(IMG)
+d.over.clear(); d.when.clear()
+ok = True
+for i in range(3 * W._CAP):
+    clock[0] += 1000
+    line = b'{"type":"safe_data","id":%d,"hex":"%s"}' % (i, b"ab" * (200 + i * 131 % 500))   # 1-3 sectors
+    st, _ = save({"REQ-%d.TXT" % i: line + b"\n"})
+    got = lines()
+    ok = ok and st == 0 and got == [line]
+    if not ok:
+        print("  request", i, "write status", st, "read", got and len(got[0]), "RAM sectors", sorted(d.over))
+        break
+check("%d big requests, never deleted, fit (RAM sectors at the end: %d)" % (3 * W._CAP, len(d.over)), ok)
 img.unlink()
 sys.exit(1 if fails else 0)

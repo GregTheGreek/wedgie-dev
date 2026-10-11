@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.40"
+VERSION = "0.3.41"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -384,7 +384,7 @@ def _dropped(R):
     dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
     if dr is None:
         return None
-    if dr.knocked:                      # a phone read PHONE.TXT twice: it asks for phone mode (slot "phone")
+    if dr.knocked:                      # a phone knocked (KNOCKB, KNOCKA, KNOCKB): phone mode (slot "phone")
         dr.knocked = False
         return b'{"type":"phone"}'
     if not (dr.wrote or "inbox" in sys.modules):

@@ -10,12 +10,16 @@
 # serial (inbox.py, through wedgie.lines()): a phone with no serial port can talk to a wedgie this way.
 #
 # Read-only until phone mode (0.3.37, Austin): a writable drive made every Mac say "Disk Not Ejected Properly"
-# at unplug, and almost nobody talks to a wedgie from a phone. A read-only drive can't take a request, but the
-# wedgie sees what's read: a phone (the iPhone app) reads PHONE.TXT twice, KNOCK_MIN-KNOCK_MAX ms apart (the
-# knock); the slot then asks on the screen (slot "phone", phone.py) and a yes calls phone(): the drive turns
-# writable and USB re-enumerates (a replug), so the phone mounts it again, writable. Until unplug. Reads in the
-# first QUIET ms don't knock (a Mac reads the whole drive when it mounts it). (A card reader's media change,
-# NOT READY then UNIT ATTENTION, wasn't enough: an iPhone kept its read-only mount.)
+# at unplug. A read-only drive can't take a request, but the wedgie sees what's read. The knock (0.3.41,
+# docs/PLAN-DRIVE-WRITE.md): read KNOCKB.TXT, then KNOCKA.TXT, then KNOCKB.TXT again, each step STEP_MIN-STEP_MAX
+# after the last (a second read of the same file within STEP_MIN is the same read: a host may read twice per
+# open). A scanner (a Mac mounting it, Windows Defender, an indexer) reads A then B milliseconds apart, so even
+# scan after scan (A B A B) never knocks; something doing it on purpose (the iPhone app, uncached) does. A knock turns
+# the drive writable at once, no question: files can't do more than USB serial, which never asks, and anything
+# that signs still asks for the green button. USB then re-enumerates (a replug) so the phone mounts it again,
+# writable, until unplug. (A card reader's media change, NOT READY then UNIT ATTENTION, wasn't enough: an
+# iPhone kept its read-only mount. 0.3.37-0.3.39 knocked by reading PHONE.TXT twice, with an 8 s quiet window
+# after plug-in and a yes on the screen; the window cost every phone 8 s and covered only a Mac's mount.)
 #
 # boot.py starts it, only at power-up (not on a soft reset). Hold Y while plugging in to skip it for
 # that boot. Adding the drive re-enumerates USB: the serial port drops and comes back about a second
@@ -31,7 +35,7 @@ _REQ_GET_MAX_LUN, _REQ_BOT_RESET = const(0xFE), const(0xFF)
 _CBW_SIG, _CSW_SIG = const(0x43425355), const(0x53425355)
 _SECTOR = const(512)
 _NO_SENSE = (0, 0, 0)
-_KNOCK_MIN, _KNOCK_MAX, _QUIET = const(700), const(10000), const(8000)   # ms: see the top
+_STEP_MIN, _STEP_MAX = const(300), const(3000)   # ms between the knock's reads: see the top
 _CAP = const(12)                    # written sectors kept in RAM: 6 KB at most (the Wallet runs with ~19 KB free)
 drive = None
 
@@ -91,10 +95,13 @@ class Drive(usbdev.Interface):
         self.full = False
         self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
         self.writable = False           # phone mode (phone()): the host may write
-        self.born = ticks_ms()
-        self.knock_at = self._find(b"PHONE   TXT")   # its first sector; a read of it is a knock
-        self.k1 = 0                     # ticks_ms of the last knock (0: none)
-        self.knocked = False            # two knocks: wedgie._dropped hands the slot {"type": "phone"}
+        self.knock_a = self._find(b"KNOCKA  TXT")    # first sectors of the knock files (-1: none)
+        self.knock_b = self._find(b"KNOCKB  TXT")
+        self.ks = 0                     # how far into B, A, B (0: nothing yet)
+        self.kt = 0                     # ticks_ms of its last step
+        self.kl = 0                     # the last knock file read (1: A, 2: B) and when: a repeat within STEP_MIN
+        self.klt = 0                    # is the same read
+        self.knocked = False            # B, A, B: wedgie._dropped hands the slot {"type": "phone"}
 
     def _find(self, name):
         """The first data sector of a file in the image's top folder, or -1."""
@@ -110,20 +117,27 @@ class Drive(usbdev.Interface):
                     return data0 + (struct.unpack_from("<H", b, o + 26)[0] - 2) * spc
         return -1
 
-    def _knock(self):
+    def _knock(self, b):
+        """A read of KNOCKB (b) or KNOCKA (not b). B, A, B, each step STEP_MIN-STEP_MAX apart, knocks."""
+        if self.writable:
+            return
         now = ticks_ms()
-        if ticks_diff(now, self.born) < _QUIET or self.writable:
-            return
-        gap = ticks_diff(now, self.k1) if self.k1 else 0
-        if self.k1 and gap < _KNOCK_MIN:            # the same open read twice: not a second knock
-            return
-        if self.k1 and gap <= _KNOCK_MAX:
-            self.k1, self.knocked = 0, True
+        f = 2 if b else 1
+        if f == self.kl and ticks_diff(now, self.klt) < _STEP_MIN:
+            return                                  # the same read again
+        self.kl, self.klt = f, now
+        ok = self.ks and _STEP_MIN <= ticks_diff(now, self.kt) <= _STEP_MAX
+        if ok and self.ks == 2 and b:
+            self.ks, self.knocked = 0, True
+        elif ok and self.ks == 1 and not b:
+            self.ks, self.kt = 2, now
+        elif b:
+            self.ks, self.kt = 1, now               # a B starts it over
         else:
-            self.k1 = now or 1
+            self.ks = 0
 
     def phone(self):
-        """Phone mode (after a yes to the knock): writable, and a replug (USB off and on) so the host mounts it again."""
+        """Phone mode (after a knock): writable, and a replug (USB off and on) so the host mounts it again."""
         if self.writable:
             return
         self.writable = True
@@ -270,8 +284,10 @@ class Drive(usbdev.Interface):
             self._fail(5, 0x20)                         # illegal request / invalid opcode
 
     def _read(self, lba, count):
-        if lba <= self.knock_at < lba + count:
-            self._knock()
+        if lba <= self.knock_a < lba + count:       # one read over both: A then B, folder order (no knock)
+            self._knock(False)
+        if lba <= self.knock_b < lba + count:
+            self._knock(True)
         self._lba, self._left, self._ok = lba, count, True
         self._sector_sent(0, 0, 0)
 

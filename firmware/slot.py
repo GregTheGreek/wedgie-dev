@@ -244,14 +244,10 @@ def _handle(m):
         W.send({"id": mid, "type": "open" if ok else "refused", "asked_ms": W.asked_ms})
         if not ok:
             _restart()
-    elif t == "phone":                  # a phone knocked on the WEDGIE drive (wedgiedrive.py): let it write?
+    elif t == "phone":                  # a phone knocked on the WEDGIE drive (wedgiedrive.py): it may write now
         dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
-        if dr is None or dr.writable:
-            return
-        if _asking(lambda: __import__("phone").ask()):
-            dr.phone()
-        else:
-            _restart()                  # a no: start again
+        if dr is not None:              # no question (0.3.41): files can't do more than USB serial, which never
+            dr.phone()                  # asks; anything that signs still asks for the green button
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
         try:
             if _asking(lambda: _job(mid, m)):

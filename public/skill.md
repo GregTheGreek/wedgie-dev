@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.40.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.41.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.40","fw":"wedgie-0.3.40","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.41","fw":"wedgie-0.3.41","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -142,7 +142,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
     {"id":9,"type":"reboot"}             -> {"type":"rebooting"} (a full restart: the port drops)
     {"id":10,"type":"open","for":"..."}  -> {"type":"open"} or {"type":"refused"}  (asks the person, in red)
     {"id":11,"type":"open","full":true}  -> the same, asked in red: full control
-    {"type":"phone"}                     -> asks "Allow phone txns?"; a yes makes the WEDGIE drive writable (phone mode)
+    {"type":"phone"}                     -> makes the WEDGIE drive writable (phone mode), no question
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
@@ -161,12 +161,14 @@ A host that can't open the serial port (an iPhone, a locked-down computer) can s
 files on the drive. It's a new way in for requests, not more power: anything that needs a yes still asks on
 the wedgie's screen.
 
-**Allow phone txns (0.3.37+).** The drive is read-only until the person allows it. To ask: read the hidden
-`PHONE.TXT` twice, 1-10 s apart, uncached, not in the first 8 s after plug-in (the wedgie ignores reads then).
-One ask at a time (two overlapping can ask twice). The wedgie asks "Allow phone txns?". After the green
-button it drops off USB for 2 s and comes back writable, with a phone in the screen's corner, until unplug. A
-no restarts it (the drive drops and comes back read-only). A Mac never sees a writable drive, so it never
-says "not ejected properly".
+**Turning it writable (0.3.41+).** The drive is read-only until something asks, so a desktop never says
+"not ejected properly". To ask: read the hidden `KNOCKB.TXT`, then `KNOCKA.TXT`, then `KNOCKB.TXT` again,
+uncached, each read 0.3-3 s after the last (0.5 s is good). A second read of the same file within 0.3 s counts
+as one. It works any time, right after plug-in too. No question on the wedgie: files can't do more than USB
+serial. The wedgie drops off USB for 2 s and comes back writable, with a phone in the screen's corner, until
+unplug. Keep asking every couple of seconds until the drive is writable; extra asks are ignored. (A scan reads
+A then B milliseconds apart, so it never asks by accident.) Firmware 0.3.37-0.3.40 asked differently: read
+`PHONE.TXT` twice 1-10 s apart, not in the first 8 s, then a yes on the wedgie ("Allow phone txns?").
 
 **Send.** Write a new file `REQ-<n>.TXT` in the top folder: one JSON request per line with your own unique
 `id`, a new name every time. The wedgie reads it 0.7 s after the last write.
@@ -176,11 +178,13 @@ line `#<count>`, then the last few answers as JSON lines, padded with newlines (
 when full. Read it uncached about every 0.7 s until an answer with your `id` is there (a few seconds; up to a
 minute while it waits for a press).
 
-**The wedgie keeps your writes in 12 sectors of RAM (6 KB, folder and FAT writes included), never flash.** It
-frees a deleted file's sectors only once the FAT says free and 2 s after they were written. So:
+**The wedgie keeps your writes in 12 sectors of RAM (6 KB, folder and FAT writes included), never flash.**
+0.3.41+ gives a request's sectors back as soon as it has read the file. Before that, only once the host's
+delete reached it and 2 s had passed. So:
 - one request at a time, the next only after the last one's answer;
-- delete every old REQ file just before writing the next (also a half-written one from a failed write);
-- keep a line under about 1.6 KB, and at least 2.2 s from one write to the next;
+- delete old REQ files (on 0.3.40 and older: every one, just before writing the next, and at least 2.2 s
+  from one write to the next);
+- keep a line under about 1.6 KB;
 - a write that fails with an I/O error means full: wait a second and try again;
 - a big request goes in pieces if its app takes them (the Safe signer: `safe_data`, 1400 hex a piece over
   the drive, then `safe_sign` with `data: "@"`).
@@ -191,13 +195,13 @@ frees a deleted file's sectors only once the FAT says free and 2 s after they we
   wherever the person last was (Recents, iCloud): tell them Browse, WEDGIE, Open. It can't be started on the
   drive before the app has been given it once (`directoryURL` to its path is ignored).
 - Check the pick: the drive has `README.txt` and `SKILL.md` at its top.
-- `volumeIsReadOnly` says whether phone txns are allowed yet. iOS has no plug-in event: poll about once a
+- `volumeIsReadOnly` says whether it's writable yet. iOS has no plug-in event: poll about once a
   second while the app is in front.
 - Read uncached (`NSFileCoordinator` `.withoutChanges` + `Data(contentsOf:options: .uncached)`) or iOS hands
   back its old copy. Plain writes; the drive doesn't do `fsync` (`FileHandle.synchronize` fails).
 - Every drive call off the main thread, with a time limit, and never at app start: a stuck drive can hang a
   call for good.
-- On a Mac, ask by reading `/Volumes/WEDGIE/PHONE.TXT` twice with `F_NOCACHE`.
+- On a Mac, ask by reading `/Volumes/WEDGIE/KNOCKB.TXT`, `KNOCKA.TXT`, `KNOCKB.TXT` with `F_NOCACHE`, 0.5 s apart.
 
 ## The hardware: parts, pinout, putting it together
 

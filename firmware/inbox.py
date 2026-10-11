@@ -8,6 +8,8 @@
 # Imported only once the host has written something (wedgie._dropped). A file is read once per power-up
 # (and again if it's saved again: a new time or size); a file starting with a 0 byte (a Mac's ._ file) is
 # skipped. Writes are taken only after the host has been quiet for SETTLE ms, so a file is read whole.
+# A file read whole gives its written sectors back at once (_free, 0.3.41): the RAM holds 12, and waiting for
+# the host's delete (an iPhone holds deletes in its cache) left a big transaction's third piece no room.
 import struct, sys
 from time import ticks_ms, ticks_diff
 
@@ -15,7 +17,7 @@ SETTLE = 700
 MAX = 16384             # bytes: a bigger file is skipped
 seen = set()            # small: one tuple per file dropped this power-up
 todo = []               # (cluster, size) of files waiting to be read
-cur = None              # [cluster, offset in it, bytes left] of the file being read
+cur = None              # [cluster, offset in it, bytes left, first cluster] of the file being read
 _geo = None
 _buf = None
 fed = False             # a request came in through a file: answers go to ANSWER.TXT too
@@ -65,6 +67,18 @@ def _scan(dr):
             if key not in seen:
                 seen.add(key)
                 todo.append((clus, size))
+
+
+def _free(dr, clus):
+    """The file starting at clus has been read whole: forget the sectors the host wrote for it."""
+    data0, spc = _geometry(dr)[3], _geometry(dr)[4]
+    for _ in range(MAX // 512 + 2):                 # a looped FAT can't hold us
+        if clus < 2 or clus >= 0xFF8:
+            return
+        for s in range(data0 + (clus - 2) * spc, data0 + (clus - 1) * spc):
+            dr.over.pop(s, None)
+            dr.when.pop(s, None)
+        clus = _next(dr, clus)
 
 
 def pump(dr, R):
@@ -132,11 +146,12 @@ def _pump(dr, R):
             if not todo:
                 return None
             clus, size = todo.pop(0)
-            cur = [clus, 0, size]
+            cur = [clus, 0, size, clus]
             if dr.sector(_geometry(dr)[3] + (clus - 2) * _geometry(dr)[4], _buf)[0] == 0:
                 cur = None                                  # binary (a Mac's ._ file): skip it
+                _free(dr, clus)
                 continue
-        clus, off, left = cur
+        clus, off, left, first = cur
         data0, spc = _geometry(dr)[3], _geometry(dr)[4]
         b = dr.sector(data0 + (clus - 2) * spc + off // 512, _buf)
         i = off % 512
@@ -154,6 +169,7 @@ def _pump(dr, R):
         off += i - off % 512
         if not left:
             cur = None
+            _free(dr, first)
             if r is None:
                 r = R.feed(10)                              # a last line with no newline
             if r is not None:
@@ -163,8 +179,9 @@ def _pump(dr, R):
             clus, off = _next(dr, clus), 0
             if clus >= 0xFF8 or clus < 2:
                 cur = None
+                _free(dr, first)
                 r2 = R.feed(10)
                 return r if r is not None else r2
-        cur = [clus, off, left]
+        cur = [clus, off, left, first]
         if r is not None:
             return r

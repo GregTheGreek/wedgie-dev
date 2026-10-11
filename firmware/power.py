@@ -6,7 +6,7 @@
 #    press only wakes it: the app never sees it.
 # On USB power none of this happens (VSYS is then USB's 5 V, so the battery can't be read) and the corner
 # is the app's. The slot starts it on a real board only (slot.run); the emulator has no battery.
-# Phone mode (0.3.37): while the WEDGIE drive is writable (a yes to a phone's knock: wedgiedrive.py) a phone
+# Phone mode (0.3.37): while the WEDGIE drive is writable (a phone's knock: wedgiedrive.py) a phone
 # shows in the corner, until unplug.
 # Runs in one real Timer (never an app's: slot._RealTimer), every TICK_MS. Integers only: nothing grows.
 import sys, time, machine
