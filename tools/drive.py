@@ -6,7 +6,7 @@
 #   README.txt              what this is
 #   SKILL.md                everything about a wedgie, for an AI: public/skill.md + code.md + trustm.md
 #   KNOCKA.TXT, KNOCKB.TXT (hidden)  read B, A, B to turn on phone mode (wedgiedrive.py knock); A before B
-#   ANSWER.TXT              the wedgie's answers to requests dropped on the drive (inbox.py fills it in RAM)
+#   ANSWER.TXT (hidden)     the wedgie's answers to requests dropped on the drive (inbox.py fills it in RAM)
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
 #   .fseventsd/no_log, .metadata_never_index  macOS: no event log, no Spotlight on it (hidden; RAM, below)
@@ -95,7 +95,7 @@ appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own
 
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
 files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY), ("SKILL.md", skill(), READONLY),
-         ("ANSWER.TXT", bytes(ANSWER_SIZE), READONLY),
+         ("ANSWER.TXT", bytes(ANSWER_SIZE), READONLY | HIDDEN),   # hidden: a file browser that shows it previews it, and a cached copy freezes the answers
          # the knock: read KNOCKB.TXT, KNOCKA.TXT, KNOCKB.TXT (uncached, within 3 s) and the drive turns writable
          ("KNOCKA.TXT", b"Read KNOCKB.TXT, then this file, then KNOCKB.TXT again (uncached, within 3 s): your wedgie's drive turns writable for requests (REQ-<n>.TXT). SKILL.md has the rest.\n", READONLY | HIDDEN),
          ("KNOCKB.TXT", b"Read this file, then KNOCKA.TXT, then this file again (uncached, within 3 s): your wedgie's drive turns writable for requests (REQ-<n>.TXT). SKILL.md has the rest.\n", READONLY | HIDDEN),

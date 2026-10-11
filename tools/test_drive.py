@@ -236,6 +236,9 @@ def answer_txt():
     with fs.open_fs("fat://" + str(img)) as v:
         return v.readbytes("ANSWER.TXT")
 check("ANSWER.TXT is on the drive (zeros until the first answer)", answer_txt() == bytes(2048))
+_root = img.read_bytes()[13 * 512:17 * 512]
+_at = [_root[o + 11] for o in range(0, len(_root), 32) if _root[o:o + 11] == b"ANSWER  TXT"]
+check("ANSWER.TXT is hidden (a file browser's cached preview froze an iPhone's answers)", _at and _at[0] & 0x02)
 check("a request came in through a file", inbox.fed)
 over = len(d.over)
 G.send({"id": 1, "type": "pong"})

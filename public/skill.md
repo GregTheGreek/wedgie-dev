@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.43.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.44.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.43","fw":"wedgie-0.3.43","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.44","fw":"wedgie-0.3.44","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -176,7 +176,10 @@ A then B milliseconds apart, so it never asks by accident.) Firmware 0.3.37-0.3.
 **Answer.** Once a request came in as a file, every answer also goes into `ANSWER.TXT` (2048 bytes): first
 line `#<count>` (0.3.42+: then the drive's state, below), then the last few answers as JSON lines, padded with newlines (strip `\0`). It starts over
 when full. Read it uncached about every 0.7 s until an answer with your `id` is there (a few seconds; up to a
-minute while it waits for a press).
+minute while it waits for a press). Never read it through a cache: the host keeps the old copy and won't see
+new answers for minutes (seen on an iPhone after re-picking the drive: the app's uncached reads got a frozen copy
+for 3-5 min, likely the picker's preview; F_NOCACHE skips the cache only for data not in it yet). 0.3.44+ hides it so file browsers don't
+show or preview it.
 
 **What reached the wedgie (0.3.42+).** The rest of `ANSWER.TXT`'s first line, refreshed every 0.5 s, read it
 uncached: `w` writes taken, `a` ms since the last, `l` its sector, `p1` written since the last look (it reads
