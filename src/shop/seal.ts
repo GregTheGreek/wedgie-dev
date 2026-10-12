@@ -7,7 +7,7 @@
 // The shipping computer's public key (uncompressed P-256 point, base64url). Its private half is made by
 // `orders.py keygen` on omen and never leaves it. It's committed here, not set on the server, so a
 // changed key shows in git. Empty = the shop stays closed. VITE_SEAL_KEY is for the probes' test key.
-const OMEN_KEY = "";
+const OMEN_KEY = "BGH00bcOxeN8KvqPy64-hPKDsu7-zlPru_C-y87P1ujL1oDei8yBD53W6Ts0TEJFcnWqTg1kIFJAc7W3w-WTYuU";
 export const SEAL_KEY: string = import.meta.env.VITE_SEAL_KEY || OMEN_KEY;
 
 const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
