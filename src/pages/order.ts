@@ -64,7 +64,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <h2>Ship to</h2>
       <p class="fine">Your address is locked right here in your browser with a key only our shipping computer has.
         Our server, the card processor and the blockchain never see it, and we delete it once the box is in the mail.</p>
-      <div class="order-fields">
+      <form class="order-fields" id="o-addr" autocomplete="on">
         <label class="wide">Name <input name="name" autocomplete="shipping name" maxlength="80"></label>
         <label class="wide">Address <input name="line1" autocomplete="shipping address-line1" maxlength="100"></label>
         <label class="wide">Apt, suite <span class="fine">(optional)</span> <input name="line2" autocomplete="shipping address-line2" maxlength="100"></label>
@@ -72,7 +72,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         <label>State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
         <label>ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
         <label class="wide">Email <span class="fine">(optional: only if something goes wrong with your order; deleted with the address)</span> <input name="email" type="email" autocomplete="email" maxlength="100"></label>
-      </div>
+      </form>
     </div>
     <div class="safe-box recess" id="o-pay">
       <h2>Pay</h2>
@@ -102,6 +102,8 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   })));
   paint();
 
+  // A real <form> (never submitted) is what makes browsers offer to fill in the saved address.
+  box.querySelector<HTMLFormElement>("#o-addr")!.onsubmit = (e) => e.preventDefault();
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
