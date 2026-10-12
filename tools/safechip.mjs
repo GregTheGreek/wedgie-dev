@@ -1,7 +1,7 @@
 // The Safe Signer app (clawdbotatg/wedgie-safe) on a virtual RP2040 (rp2040js, the real MicroPython build
 // and its real heap: tools/rp2040/chip.mjs), the way /safe drives it: hello (its key), then safe_sign for
 // a plain send, an add owner (of itself), a removal, and a MultiSend batch as big as /safe lets through
-// (one USB line just under 6 KB, a page per action), A pressed through every page; and one answered Y.
+// (one USB line just under 6 KB, a page per action, no intro page), A pressed through every page; and one answered Y.
 // The virtual chip has no Trust M, so a yes ends in the app's error answer at the chip step; everything
 // before it (parsing, the Safe tx hash in pure-Python keccak, the decode, the screens) runs for real.
 // A MemoryError, a traceback, "wedgie broke" or no answer fails it. Prints the least free heap seen.
@@ -107,7 +107,7 @@ const cases = [
   ["send 0.5 ETH", tx("0x" + "77".repeat(20), "0x", "500000000000000000"), 1],
   ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1],
   ["remove owner: itself", tx(safe, E.removeOwnerData(E.SENTINEL, signer, 1)), 1],
-  [`MultiSend batch, ${n} USDC sends (${JSON.stringify(batch).length} B line)`, batch, n + 1],
+  [`MultiSend batch, ${n} USDC sends (${JSON.stringify(batch).length} B line)`, batch, n],
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until
  *  it answers; the answer and how long it took in chip time. */
