@@ -10,7 +10,7 @@ export type Cart = Record<Item, number>;
 export const MAX_EACH = 10;
 export const SHIPS = "Ships within a week, US only.";
 
-// Busy days cost more: every TIER boxes sold today (Mountain time, wedgies and kits together) adds STEP to
+// Busy days cost more: every TIER boxes sold in a day (8 AM to 8 AM Mountain, wedgies and kits together) adds STEP to
 // each one after, with no top. 5 sold, buy 3: 1 at $67, 2 at $82. `sold` comes from api/ (paid orders).
 export const TIER = 6, STEP = 1500;
 export const bump = (n: number) => STEP * Math.floor(n / TIER);

@@ -70,10 +70,10 @@ export const publicView = (o: Order) => ({
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
 
-/** Boxes in orders paid today, Mountain time: what today's price is set by (catalog.ts cartLines). */
+/** Boxes in orders paid since 8 AM Mountain (the shop's day): what today's price is set by (catalog.ts cartLines). */
 export async function soldToday(sql: Awaited<ReturnType<typeof db>>) {
   const [r] = await sql`select coalesce(sum((cart->>'wedgie')::int + (cart->>'kit')::int), 0)::int as n from orders
-    where status in ('paid', 'shipped') and (paid_at at time zone 'America/Denver')::date = (now() at time zone 'America/Denver')::date`;
+    where status in ('paid', 'shipped') and (paid_at at time zone 'America/Denver' - interval '8 hours')::date = (now() at time zone 'America/Denver' - interval '8 hours')::date`;
   return r.n as number;
 }
 

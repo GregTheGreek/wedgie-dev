@@ -58,7 +58,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         </div>`).join("")}
       <p class="order-total"><b id="o-total"></b> <span class="fine">shipped. ${esc(SHIPS)}</span></p>
       <p class="fine" id="o-lines" hidden></p>
-      <p class="fine">Price goes up ${usd(STEP)} after every ${TIER} sold in a day.</p>
+      <p class="fine">Price goes up ${usd(STEP)} after every ${TIER} sold. Resets 8 AM Mountain.</p>
     </div>
     <div class="safe-box recess" id="o-ship">
       <h2>Ship to</h2>
