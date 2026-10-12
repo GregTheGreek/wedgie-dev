@@ -84,10 +84,9 @@ export function home(main: HTMLElement): Promise<unknown> {
           <button data-for="kit" role="radio" aria-checked="false">Kit</button>
         </div>
         <div class="row">
-          <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
-          <button class="btn" data-pay="card" disabled>Pay with card</button>
+          <a class="btn btn-green" id="order-go" href="/order">Order</a>
         </div>
-        <p class="fine soon">Checkout opens soon.</p>
+        <p class="fine">Card or USDC. Ships within a week, US only.</p>
       </div>
     </div>
   </section>
@@ -136,9 +135,12 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
-    main.querySelector("#order-what")!.innerHTML = b.dataset.for === "kit"
-      ? `Every part in the mail with <a href="/assemble">assembly instructions</a>.`
+    const kit = b.dataset.for === "kit";
+    main.querySelector("#order-what")!.innerHTML = kit
+      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a>.`
       : "One wedgie: pico, screen, chip, and case.";
+    price.firstChild!.nextSibling!.textContent = kit ? "$57 " : "$67 ";
+    main.querySelector<HTMLAnchorElement>("#order-go")!.href = kit ? "/order?item=kit" : "/order";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   library(main.querySelector<HTMLElement>("#lib")!);

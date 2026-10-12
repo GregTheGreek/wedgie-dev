@@ -34,6 +34,13 @@ Passwords: `.env` here and `~/.wedgie-credentials.env`. Never in git. New accoun
 11. Nothing touches `navigator.serial` until the user tapped Connect (Mac Bluetooth prompt).
 12. The page never drives a wedgie by default. Everything is MIT.
 
+## The shop (/order)
+
+Never holds an address it can read. The browser seals it (`src/shop/seal.ts`) to omen's key (`OMEN_KEY`,
+committed; private half only on omen, `wedgie-shipping/orders.py`). `api/` (Vercel + Neon) keeps only the
+sealed text and wipes it when omen ships. Stripe gets no address. Never log a request body in `api/`.
+Prices: `src/shop/catalog.ts`. Test: `ORDERS_PY=<wedgie-shipping>/orders.py node tools/shopprobe.mjs`.
+
 ## Run / check
 
 ```

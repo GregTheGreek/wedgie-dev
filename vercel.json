@@ -68,6 +68,15 @@
           "value": "application/x-apple-aspen-config"
         }
       ]
+    },
+    {
+      "source": "/order(.*)",
+      "headers": [
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        }
+      ]
     }
   ],
   "rewrites": [
@@ -113,6 +122,14 @@
     },
     {
       "source": "/safe/:id",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/order",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/order/:id",
       "destination": "/index.html"
     }
   ],

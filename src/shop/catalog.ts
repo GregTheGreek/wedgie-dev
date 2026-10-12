@@ -1,0 +1,29 @@
+// What the shop sells. Read by the order page and by the server (api/), so a price lives in one place.
+// Prices are US dollars in cents, shipping included (US only: Ground Advantage is ~$6, international
+// is $16-30, over the $10 we'll eat; wedgie-shipping README).
+export const ITEMS = {
+  wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case. Plug it in and go.", cents: 6700 },
+  kit: { name: "wedgie kit", what: "Every part and the case, with assembly instructions.", cents: 5700 },
+} as const;
+export type Item = keyof typeof ITEMS;
+export type Cart = Record<Item, number>;
+export const MAX_EACH = 10;
+export const SHIPS = "Ships within a week, US only.";
+
+export const cartCents = (c: Cart) => (Object.keys(ITEMS) as Item[]).reduce((t, k) => t + ITEMS[k].cents * c[k], 0);
+export function cartOk(c: unknown): c is Cart {
+  const o = c as Record<string, unknown>;
+  if (!o || typeof o !== "object") return false;
+  const ns = (Object.keys(ITEMS) as Item[]).map((k) => o[k]);
+  return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0);
+}
+
+// USDC: the same contract kind (6 decimals) on each chain the shop takes.
+export const PAY_CHAINS: Record<number, { name: string; usdc: string; rpc: string; scan: string; confirm: number }> = {
+  8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", rpc: "https://mainnet.base.org", scan: "https://basescan.org", confirm: 3 },
+  1: { name: "Ethereum", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", confirm: 2 },
+};
+
+// What the buyer types, sealed in their browser (seal.ts) before it leaves it.
+export type ShipTo = { name: string; line1: string; line2: string; city: string; state: string; zip: string; email: string };
+export const STATES = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP AA AE AP".split(" ");

@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin, type Connect } from "vite";
 import { readFileSync, statSync } from "node:fs";
 // @ts-ignore plain JS build helper
 import { buildFirmware } from "./tools/fw.mjs";
@@ -63,12 +63,48 @@ function loaderManifest(): Plugin {
   };
 }
 
+// The shop's server (api/*.ts, Vercel functions in production) under `vite` and `vite preview`, so the
+// probes can order end to end. Always the dev database branch (SHOP_DATABASE_URL_DEV in .env), never
+// the real orders. Only SHOP_* and STRIPE_* come from .env.
+function shopApi(): Plugin {
+  const env = loadEnv("development", process.cwd(), "");
+  for (const [k, v] of Object.entries(env)) if (/^(SHOP_|STRIPE_)/.test(k) && !(k in process.env)) process.env[k] = v;
+  process.env.SHOP_DATABASE_URL = process.env.SHOP_DATABASE_URL_DEV || "";
+  let load: (u: string) => Promise<Record<string, any>>;
+  const mw: Connect.NextHandleFunction = async (req, res, next) => {
+    const m = /^\/api\/(\w+)(?:\?|$)/.exec(req.url || "");
+    if (!m) return next();
+    try {
+      const mod = await load(`/api/${m[1]}.ts`);
+      const fn = mod[req.method || "GET"];
+      if (!fn) { res.statusCode = 405; return res.end(); }
+      const chunks: Buffer[] = [];
+      for await (const c of req) chunks.push(c as Buffer);
+      const r: Response = await fn(new Request(`http://${req.headers.host}${req.url}`, { method: req.method,
+        headers: req.headers as Record<string, string>, body: chunks.length ? Buffer.concat(chunks) : undefined }));
+      res.statusCode = r.status;
+      r.headers.forEach((v, k) => res.setHeader(k, v));
+      res.end(Buffer.from(await r.arrayBuffer()));
+    } catch (e) { console.error("api:", e); res.statusCode = 500; res.end(JSON.stringify({ error: String(e) })); }
+  };
+  return {
+    name: "wedgie-shop-api",
+    configureServer(server) { load = (u) => server.ssrLoadModule(u); server.middlewares.use(mw); },
+    async configurePreviewServer(server) {
+      const { createServer } = await import("vite");
+      const vs = await createServer({ configFile: false, server: { middlewareMode: true }, appType: "custom", logLevel: "silent" });
+      load = (u) => vs.ssrLoadModule(u);
+      server.middlewares.use(mw);
+    },
+  };
+}
+
 // The virtual wedgie (src/emu) needs SharedArrayBuffer, i.e. cross-origin isolation. vercel.json
 // sends the same headers in production.
 const ISOLATE = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp" };
 
 export default defineConfig({
-  plugins: [firmware(), loaderManifest()],
+  plugins: [firmware(), loaderManifest(), shopApi()],
   // emu.html (the virtual wedgie's test page) is served by `vite` in dev; it is built only for
   // tools/emuprobe.mjs (WEDGIE_EMU_TEST=1), so the production site's chunks stay as they were.
   build: { target: "es2022", assetsInlineLimit: 0, ...(process.env.WEDGIE_EMU_TEST ? { rollupOptions: { input: { main: "index.html", emu: "emu.html" } } } : {}) },
