@@ -94,7 +94,16 @@ for (;;) {
   if (JSON.stringify({ id: 1000, type: "safe_sign", tx: t }).length > 6000) break;
   batch = t; n++;
 }
+// Instant Wallet's "change the daily limit" (USDC + ETH allowances on this Safe's Roles, the relay's fee): one page
+const W32 = (n) => BigInt(n).toString(16).padStart(64, "0");
+const ROLES = "0x556a10637548f31dd0f284b1143807a5dbc66dd0";      // Instant's rolesAddress(safe) for this safe
+const allow = (k, v) => ({ to: ROLES, data: "0xa8ec43ee" + k + W32(v).repeat(3) + W32(86400) + W32(1) });
+const limit = { ...tx("0x40A2aCCbd92BCA938b02010E17A5b8929b49130D", pack([
+  allow("8cf0b93cd9d3e32167f8de799f8e55df33697bb155a46b384f39bd78e75879b5", 50000000),
+  allow("45cc4838df5ba19e2e80bafaf996e5acf9194b3706f31dfa92fdfb8cc4fd3017", 10n ** 16n),
+  { to: usdc, data: E.transferData("0x4cfab32186e65e2a39ec0e882e11380cbf2f8a2f", 23321n) }])), operation: 1 };
 const cases = [
+  ["change the daily limit (3 actions, 1 page)", limit, 1],
   ["send 0.5 ETH", tx("0x" + "77".repeat(20), "0x", "500000000000000000"), 1],
   ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1],
   ["remove owner: itself", tx(safe, E.removeOwnerData(E.SENTINEL, signer, 1)), 1],
