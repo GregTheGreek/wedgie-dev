@@ -3,7 +3,7 @@
 //   POST {id, tracking}          shipped: the sealed address, payer, transaction and Stripe session are wiped
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way
 // Each GET also deletes what's done with: shipped or canceled orders and unpaid ones, 30 days on.
-import { db, env, json, oops, same } from "./_shop";
+import { db, env, json, oops, same } from "./_shop.js";
 
 const allowed = (req: Request) => {
   const t = env("SHOP_ADMIN_TOKEN");

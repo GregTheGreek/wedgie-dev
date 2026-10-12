@@ -6,7 +6,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (optional, else a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, PAY_CHAINS, cartCents, type Cart, type Item } from "../src/shop/catalog";
+import { ITEMS, PAY_CHAINS, cartCents, type Cart, type Item } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";

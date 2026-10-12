@@ -3,8 +3,8 @@
 //   POST {cart, sealed, pay, chain?}          a new order -> {id, token, url?} (url: Stripe Checkout)
 //   POST {id, token, tx?}                     its status; tx = a USDC payment to check
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
-import { PAY_CHAINS, cartOk } from "../src/shop/catalog";
-import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, usdcPaid, cartCents, type Order } from "./_shop";
+import { PAY_CHAINS, cartOk } from "../src/shop/catalog.js";
+import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, usdcPaid, cartCents, type Order } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number) });
 
