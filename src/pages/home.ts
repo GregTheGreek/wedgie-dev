@@ -1,5 +1,6 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
+import { ITEMS, bump, type Item } from "../shop/catalog";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
@@ -14,7 +15,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.</p>
       <div class="row">
         <a class="btn btn-green" href="#build">Build your own</a>
-        <a class="btn" href="#get">Buy one · $67</a>
+        <a class="btn" href="#get" id="buy-one">Buy one · $67</a>
       </div>
     </div>
     <div class="hero-art" id="hero-dev"></div>
@@ -133,13 +134,23 @@ export function home(main: HTMLElement): Promise<unknown> {
   const lane = main.querySelector<HTMLElement>(".truck-lane")!;
   new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { lane.classList.add("go"); o.disconnect(); } }, { threshold: 0.35 }).observe(lane);
 
+  // Today's price: it climbs on busy days (shop/catalog.ts).
+  let item: Item = "wedgie", sold = 0;
+  const showPrice = () => {
+    const c = ITEMS[item].cents + bump(sold);
+    price.firstChild!.nextSibling!.textContent = `$${c / 100} `;
+    main.querySelector("#buy-one")!.textContent = `Buy one · $${(ITEMS.wedgie.cents + bump(sold)) / 100}`;
+  };
+  fetch("/api/order").then((r) => r.json()).then((r) => { sold = r.sold || 0; showPrice(); }, () => {});
+
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
       ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a>.`
       : "One wedgie: pico, screen, chip, and case.";
-    price.firstChild!.nextSibling!.textContent = kit ? "$57 " : "$67 ";
+    item = kit ? "kit" : "wedgie";
+    showPrice();
     main.querySelector<HTMLAnchorElement>("#order-go")!.href = kit ? "/order?item=kit" : "/order";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);

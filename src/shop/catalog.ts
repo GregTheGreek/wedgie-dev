@@ -10,7 +10,21 @@ export type Cart = Record<Item, number>;
 export const MAX_EACH = 10;
 export const SHIPS = "Ships within a week, US only.";
 
-export const cartCents = (c: Cart) => (Object.keys(ITEMS) as Item[]).reduce((t, k) => t + ITEMS[k].cents * c[k], 0);
+// Busy days cost more: every TIER boxes sold today (Mountain time, wedgies and kits together) adds STEP to
+// each one after, up to TOPS steps. 8 sold, buy 5: 2 at $67, 3 at $77. `sold` comes from api/ (paid orders).
+export const TIER = 10, STEP = 1000, TOPS = 4;
+export const bump = (n: number) => STEP * Math.min(TOPS, Math.floor(n / TIER));
+export type Line = { item: Item; qty: number; cents: number };
+export function cartLines(c: Cart, sold: number): Line[] {
+  const lines: Line[] = [];
+  let n = sold;
+  for (const k of Object.keys(ITEMS) as Item[]) for (let i = 0; i < c[k]; i++, n++) {
+    const cents = ITEMS[k].cents + bump(n), last = lines[lines.length - 1];
+    if (last?.item === k && last.cents === cents) last.qty++; else lines.push({ item: k, qty: 1, cents });
+  }
+  return lines;
+}
+export const cartCents = (c: Cart, sold: number) => cartLines(c, sold).reduce((t, l) => t + l.qty * l.cents, 0);
 export function cartOk(c: unknown): c is Cart {
   const o = c as Record<string, unknown>;
   if (!o || typeof o !== "object") return false;

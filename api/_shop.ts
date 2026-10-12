@@ -6,7 +6,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (optional, else a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, PAY_CHAINS, cartCents, type Cart, type Item } from "../src/shop/catalog.js";
+import { ITEMS, PAY_CHAINS, cartLines, type Cart, type Line } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -35,6 +35,7 @@ export async function db() {
       created timestamptz not null default now(), paid_at timestamptz, shipped_at timestamptz)`;
     await sql`create unique index if not exists orders_open_usdc on orders (chain, usdc) where status = 'new' and usdc is not null`;
     await sql`create unique index if not exists orders_tx on orders (chain, tx) where tx is not null`;
+    await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -57,17 +58,24 @@ export function same(a: string, b: string) {   // constant time
 }
 
 export type Order = {
-  id: string; token_hash: string; cart: Cart; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
+  id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; stripe_session: string | null; tx: string | null; payer: string | null;
   tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
 export const publicView = (o: Order) => ({
-  id: o.id, cart: o.cart, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
+  id: o.id, cart: o.cart, lines: o.lines, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
   payTo: o.pay === "usdc" && o.status === "new" ? env("SHOP_PAY_TO") : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
+
+/** Boxes in orders paid today, Mountain time: what today's price is set by (catalog.ts cartLines). */
+export async function soldToday(sql: Awaited<ReturnType<typeof db>>) {
+  const [r] = await sql`select coalesce(sum((cart->>'wedgie')::int + (cart->>'kit')::int), 0)::int as n from orders
+    where status in ('paid', 'shipped') and (paid_at at time zone 'America/Denver')::date = (now() at time zone 'America/Denver')::date`;
+  return r.n as number;
+}
 
 // ---- Stripe (its REST API; payment only: it is never sent an address) ----
 async function stripe(path: string, form?: Record<string, string>) {
@@ -81,7 +89,7 @@ async function stripe(path: string, form?: Record<string, string>) {
   return r;
 }
 
-export async function checkout(o: Pick<Order, "id" | "cart">, origin: string) {
+export async function checkout(o: Pick<Order, "id" | "cart" | "lines">, origin: string) {
   const f: Record<string, string> = {
     mode: "payment",
     client_reference_id: o.id,
@@ -91,14 +99,12 @@ export async function checkout(o: Pick<Order, "id" | "cart">, origin: string) {
     success_url: `${origin}/order/${o.id}`,
     cancel_url: `${origin}/order/${o.id}`,
   };
-  let i = 0;
-  for (const k of Object.keys(ITEMS) as Item[]) if (o.cart[k]) {
-    f[`line_items[${i}][quantity]`] = String(o.cart[k]);
+  (o.lines || cartLines(o.cart, 0)).forEach((l, i) => {     // the prices the order was made at, even on a later day
+    f[`line_items[${i}][quantity]`] = String(l.qty);
     f[`line_items[${i}][price_data][currency]`] = "usd";
-    f[`line_items[${i}][price_data][unit_amount]`] = String(ITEMS[k].cents);
-    f[`line_items[${i}][price_data][product_data][name]`] = ITEMS[k].name;
-    i++;
-  }
+    f[`line_items[${i}][price_data][unit_amount]`] = String(l.cents);
+    f[`line_items[${i}][price_data][product_data][name]`] = ITEMS[l.item].name;
+  });
   return stripe("checkout/sessions", f) as Promise<{ id: string; url: string }>;
 }
 export const session = (id: string) => stripe("checkout/sessions/" + id) as Promise<{ id: string; url: string | null; status: string; payment_status: string; metadata: Record<string, string> }>;
@@ -138,4 +144,3 @@ export async function usdcPaid(o: Order, tx: string): Promise<{ paid: true; paye
   return { paid: true, payer: "0x" + log.topics[1].slice(-40) };
 }
 export const fmtUsdc = (u: string | bigint) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0")}`; };
-export { cartCents };

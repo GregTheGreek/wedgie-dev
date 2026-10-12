@@ -4,7 +4,7 @@
 // Ethereum, for an amount whose last digits (under a cent) name the order; the server checks it on chain.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, TIER, STEP, bump, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
 
@@ -53,10 +53,12 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     <div class="safe-box recess" id="o-cart">
       ${(Object.keys(ITEMS) as Item[]).map((k) => `
         <div class="order-line" data-item="${k}">
-          <div><b>${esc(ITEMS[k].name)}</b> <span class="fine">${usd(ITEMS[k].cents)}</span><br><span class="fine">${esc(ITEMS[k].what)}</span></div>
+          <div><b>${esc(ITEMS[k].name)}</b> <span class="fine price"></span><br><span class="fine">${esc(ITEMS[k].what)}</span></div>
           <div class="qty"><button class="btn btn-sm" data-d="-1" aria-label="fewer">−</button><b class="n"></b><button class="btn btn-sm" data-d="1" aria-label="more">+</button></div>
         </div>`).join("")}
       <p class="order-total"><b id="o-total"></b> <span class="fine">shipped. ${esc(SHIPS)}</span></p>
+      <p class="fine" id="o-lines" hidden></p>
+      <p class="fine">Price goes up ${usd(STEP)} after every ${TIER} sold in a day.</p>
     </div>
     <div class="safe-box recess" id="o-ship">
       <h2>Ship to</h2>
@@ -81,9 +83,17 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     </div>
     ${yours.length ? `<div class="safe-box recess"><h2>Your orders</h2><p>${yours.map(([i]) => `<a href="/order/${esc(i)}">${esc(i)}</a>`).join(" · ")}</p></div>` : ""}`;
 
+  let sold = 0;     // boxes paid for today: sets the price (catalog.ts); the server counts again at checkout
   const paint = () => {
-    box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => (l.querySelector(".n")!.textContent = String(cart[l.dataset.item as Item])));
-    box.querySelector("#o-total")!.textContent = usd(cartCents(cart));
+    box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => {
+      const k = l.dataset.item as Item;
+      l.querySelector(".n")!.textContent = String(cart[k]);
+      l.querySelector(".price")!.textContent = usd(ITEMS[k].cents + bump(sold));
+    });
+    box.querySelector("#o-total")!.textContent = usd(cartCents(cart, sold));
+    const lines = cartLines(cart, sold), el = box.querySelector<HTMLElement>("#o-lines")!;
+    el.hidden = lines.length < 2;
+    el.textContent = lines.map((x) => `${x.qty} × ${ITEMS[x.item].name} at ${usd(x.cents)}`).join(" + ");
   };
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
     const k = l.dataset.item as Item;
@@ -95,7 +105,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
-  api().then((r) => { shop = SEAL_KEY ? r : { card: false, usdc: false }; }, () => {}).finally(() => {
+  api().then((r) => { shop = SEAL_KEY ? r : { card: false, usdc: false }; sold = r.sold || 0; paint(); }, () => {}).finally(() => {
     card.disabled = !shop.card; crypto.disabled = !shop.usdc;
     openEl.textContent = shop.card || shop.usdc ? "" : "Checkout opens soon.";
     openEl.hidden = !openEl.textContent;
@@ -107,7 +117,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city" : !STATES.includes(s.state) ? "your state"
       : !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP" : s.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "a real email, or none" : "";
     if (bad) { say(`Fill in ${bad}.`, true); return null; }
-    if (!cartCents(cart)) { say("Pick at least one.", true); return null; }
+    if (!cartCents(cart, sold)) { say("Pick at least one.", true); return null; }
     return s;
   };
   const go = async (pay: "card" | "usdc", b: HTMLButtonElement) => {
@@ -128,7 +138,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 }
 
 // ---- one order ----
-type View = { id: string; cart: Cart; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
+type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
   tracking: string | null; url?: string; why?: string };
 
 function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) => void) {
@@ -148,7 +158,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (now === shown) return;     // polling: don't wipe a half-pasted transaction hash
     shown = now;
     const c = v.chain ? PAY_CHAINS[v.chain] : null;
-    const items = (Object.keys(ITEMS) as Item[]).filter((k) => v!.cart[k]).map((k) => `${v!.cart[k]} × ${esc(ITEMS[k].name)}`).join(", ");
+    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${esc(ITEMS[l.item].name)} at ${usd(l.cents)}`).join(", ")
+      : (Object.keys(ITEMS) as Item[]).filter((k) => v!.cart[k]).map((k) => `${v!.cart[k]} × ${esc(ITEMS[k].name)}`).join(", ");
     let h = `<div class="safe-box recess"><h2>Order ${esc(v.id)}</h2><p>${items} · <b>${usd(v.cents)}</b> shipped</p>`;
     if (v.status === "new" && v.pay === "card") h += `<p>Not paid yet.</p>${v.url ? `<p><a class="btn" href="${esc(v.url)}">Pay by card</a></p>` : ""}`;
     if (v.status === "new" && v.pay === "usdc" && c) {
