@@ -1,6 +1,6 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
-import { ITEMS, bump, type Item } from "../shop/catalog";
+import { ITEMS, TIER, bump, type Item } from "../shop/catalog";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
@@ -122,9 +122,10 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   // $67: the 6-7 hands, for a moment, each time the price comes into view.
   const price = main.querySelector<HTMLElement>(".order-price")!;
+  let item: Item = "wedgie", sold = 0;
   let hands: { play(): void } | null = null;
   new IntersectionObserver(async (es) => {
-    if (!es.some((e) => e.isIntersecting)) return;
+    if (!es.some((e) => e.isIntersecting) || sold >= TIER) return;
     await pageShown;
     if (!hands) { const { mountSixSeven } = await import("../ui/sixseven"); hands = mountSixSeven(price.querySelector(".sixseven-box")!); }
     hands.play();
@@ -135,8 +136,8 @@ export function home(main: HTMLElement): Promise<unknown> {
   new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { lane.classList.add("go"); o.disconnect(); } }, { threshold: 0.35 }).observe(lane);
 
   // Today's price: it climbs on busy days (shop/catalog.ts).
-  let item: Item = "wedgie", sold = 0;
   const showPrice = () => {
+    price.querySelector<HTMLElement>(".sixseven-box")!.hidden = sold >= TIER;   // no 6-7 once it isn't $67
     const c = ITEMS[item].cents + bump(sold);
     price.firstChild!.nextSibling!.textContent = `$${c / 100} `;
     main.querySelector("#buy-one")!.textContent = `Buy one · $${(ITEMS.wedgie.cents + bump(sold)) / 100}`;
