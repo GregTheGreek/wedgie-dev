@@ -27,7 +27,12 @@ def stuck(e):
     except Exception:
         pass
     from machine import Pin
-    a, b = Pin(15, Pin.IN, Pin.PULL_UP), Pin(17, Pin.IN, Pin.PULL_UP)
+    try:                # green and red: another screen (oled.py) has them on other pins
+        import lcd
+        ka, kb = lcd.KEYS["A"], lcd.KEYS.get("B", lcd.KEYS["Y"])
+    except Exception:
+        ka, kb = 15, 17
+    a, b = Pin(ka, Pin.IN, Pin.PULL_UP), Pin(kb, Pin.IN, Pin.PULL_UP)
     while a.value() == 0 or b.value() == 0:
         time.sleep_ms(20)
     while True:

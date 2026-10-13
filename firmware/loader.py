@@ -218,6 +218,9 @@ def screen(title="", what="", bar=True):
     loaded, or with nothing to measure; the install draws the real bar after its clean restart."""
     import ui
     d = lcd.LCD()
+    if d.width < 240:                       # a small screen (oled.py): no logo, no bar
+        import small
+        return small.busy(d, title, what)
     logo(d)
     lines = [l for l in ui.wrap(title, ui.COLS_BIG) if l][:2]
     for i, l in enumerate(lines):
@@ -262,6 +265,8 @@ def _track(d):
 def what(text):
     """Change the line under the bar (screen()) without touching the bar."""
     d = lcd.LCD()
+    if d.width < 240:
+        return
     try:
         with open("logo.bin", "rb") as f:
             f.seek(8)

@@ -48,6 +48,9 @@ def _band(title, lines, hint=""):
 
 def empty():
     """The wedgie's own home: where to get software (wedgie.dev, big, over the logo), then "No software"."""
+    if d.width < 240:                       # a small screen (oled.py)
+        import small
+        return small.empty(d, W.short())
     import loader
     y = loader.logo(d)
     d.center_text("wedgie.dev", 30, INK, 3)

@@ -28,6 +28,9 @@ def ask():
 def shown(d):
     """While the computer has it: the underwear, and what that means. Nothing draws over it (the app is
     stopped: slot.let_in), so it stays up until a restart or an unplug."""
+    if d.width < 240:                       # a small screen (oled.py)
+        import small
+        return small.shown(d)
     import loader
     y = loader.logo(d) or 60
     d.center_text("COMPUTER HAS", y + 12, ui.RED, 2)

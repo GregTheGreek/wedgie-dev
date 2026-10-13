@@ -72,6 +72,11 @@ def show(path="logo.bin", keep=False):
     global up, bg
     if up:
         return
+    try:
+        os.stat("oled")             # another screen (oled.py): this logo is for the LCD
+        return
+    except OSError:
+        pass
     if keep:
         try:
             with open(path, "rb") as f:

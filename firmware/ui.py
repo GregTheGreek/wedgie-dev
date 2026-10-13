@@ -81,7 +81,7 @@ def say(d, s, y, c=INK, scale=1, edge=INK):
         parts.append(_KEY[s[j + 1]])
         s = s[j + 3:]
     w = 8 * scale
-    x = (240 - w * sum(len(p) if isinstance(p, str) else 1 for p in parts)) // 2
+    x = (d.width - w * sum(len(p) if isinstance(p, str) else 1 for p in parts)) // 2
     for p in parts:
         if isinstance(p, str):
             if scale == 1:
@@ -98,6 +98,9 @@ def say(d, s, y, c=INK, scale=1, edge=INK):
 def page(d, head, lines=(), hint="", show=True):
     """The standard screen: white, the waistband, a big title, lines of (text, color), a hint at the
     bottom. Nothing else on a system screen."""
+    if d.width < 240:                       # a small screen (oled.py): small.py lays it out
+        import small
+        return small.page(d, head, lines, hint, show)
     d.fill(WHITE)
     band(d)
     y = title(d, head, 72) + 12
@@ -136,6 +139,9 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     everything (full control: slot.let_in). big: what it's about, drawn huge under a one-line question
     (scale 3, a word a line, or scale 2 for long words) with a small green check after its last line:
     a signed update's version, a signed app's name."""
+    if d.width < 240:
+        import small
+        return small.ask(d, question, lines, yes, no, ms, keys, scary, big)
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
     bg, fg = (RED, WHITE) if scary else (WHITE, INK)

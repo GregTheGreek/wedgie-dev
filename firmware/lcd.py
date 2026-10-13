@@ -394,3 +394,12 @@ class Keys:
             return False
         t = _hold.get(k)
         return t is not None and time.ticks_diff(t, time.ticks_ms()) > 0
+
+
+# Another screen (docs/SCREENS.md): a file named "oled" on the wedgie swaps in the Pico-OLED-1.3's driver.
+try:
+    import os
+    os.stat("oled")
+    from oled import LCD, KEYS
+except (OSError, ImportError):
+    pass
