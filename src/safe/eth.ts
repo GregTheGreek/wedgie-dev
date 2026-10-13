@@ -91,13 +91,20 @@ export const FACTORY = "0x1d31F259eE307358a26dFb23EB365939E8641195";
 const SINGLETON = "0x4E27b51350e6c2083EE19011120F50DAfEc5CA50";
 // Verify with the chain's P-256 precompile (EIP-7951 / RIP-7212) and no fallback contract.
 export const VERIFIERS = 0x100n << 160n;
+// Instant Wallet (instantwallet.io) adds a wedgie as two owners, the same key with other verifiers: the precompile
+// with Daimo's verifier as the fallback, and Daimo only. Different verifiers = different signer addresses.
+const DAIMO = 0xc2b78104907F722DABAc4C69f826a522B2754De4n;
+export const IW_VERIFIERS = [VERIFIERS | DAIMO, DAIMO];
 // SafeWebAuthnSignerProxy's creation code, from the factory's bytecode on Base (it CREATE2s this).
 const PROXY_CODE = "0x610100346100ad57601f6101b538819003918201601f19168301916001600160401b038311848410176100b2578084926080946040528339810103126100ad578051906001600160a01b03821682036100ad5760208101516040820151606090920151926001600160b01b03841684036100ad5760805260a05260c05260e05260405160ec90816100c98239608051816082015260a05181604d015260c051816027015260e0518160010152f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe7f000000000000000000000000000000000000000000000000000000000000000060b63601527f000000000000000000000000000000000000000000000000000000000000000060a03601527f000000000000000000000000000000000000000000000000000000000000000036608001523660006080376000806056360160807f00000000000000000000000000000000000000000000000000000000000000005af43d600060803e60b1573d6080fd5b3d6080f3fea26469706673582212201660515548d15702d720bbc046b457ca85e941a4559ab9f9518488e4c82e5ee964736f6c634300081a0033";
 
-export function signerAddress(x: string, y: string) {
-  const code = keccak256(cat(bytes(PROXY_CODE), aword(SINGLETON), word(x), word(y), word(VERIFIERS)));
+export function signerAddress(x: string, y: string, verifiers = VERIFIERS) {
+  const code = keccak256(cat(bytes(PROXY_CODE), aword(SINGLETON), word(x), word(y), word(verifiers)));
   return checksum(hex(keccak256(cat(bytes("0xff"), bytes(FACTORY), new Uint8Array(32), code)).slice(12)));
 }
+
+/** Every address the key can own a Safe as: ours first, then Instant Wallet's two. */
+export const signerAddresses = (x: string, y: string) => [VERIFIERS, ...IW_VERIFIERS].map((v) => signerAddress(x, y, v));
 
 export type WedgieSig = { r: string; s: string; authenticatorData: string; clientDataFields: string };
 

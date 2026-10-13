@@ -97,6 +97,22 @@ const t2 = { ...tx(newbie, "0x", 0), value: "1000" };
 await send(solo, E.execData(t2, E.packSignatures([{ owner: signer, signature: E.safeSignature(signer, wedgieSign(E.safeTxHash(chain, solo, t2))) }])));
 ok(BigInt(await rpc("eth_getBalance", [newbie, "latest"])) === 1000n, "wedgie-only Safe: sends ETH on the wedgie's signature");
 
+// Instant Wallet's shape: the wedgie as two owners (other verifiers, other addresses) + a wallet, 3 of 3.
+// One press signs for both slots (eth.ts signerAddresses).
+const [, iw1, iw2] = E.signerAddresses(key.x, key.y);
+for (const [a, v] of [[iw1, E.IW_VERIFIERS[0]], [iw2, E.IW_VERIFIERS[1]]]) {
+  const g = await view(E.FACTORY, E.call("getSigner(uint256,uint256,uint176)", [E.word(key.x), E.word(key.y), E.word(v)]));
+  ok(eq("0x" + g.slice(26), a), `Instant Wallet slot ${a} = factory getSigner`);
+  await send(E.FACTORY, E.call("createSigner(uint256,uint256,uint176)", [E.word(key.x), E.word(key.y), E.word(v)]));
+}
+const iw = await makeSafe([iw1, iw2, E.checksum(me)], 3);
+await rpc("anvil_setBalance", [iw, "0xde0b6b3a7640000"]);
+const t4 = { ...tx(newbie, "0x", 0), value: "2000" };
+const h4 = E.safeTxHash(chain, iw, t4), g4 = wedgieSign(h4);
+const w4 = E.ecdsa(await rpc("eth_signTypedData_v4", [me, JSON.stringify(E.typedData(chain, iw, t4))]));
+await send(iw, E.execData(t4, E.packSignatures([{ owner: me, signature: w4 }, ...[iw1, iw2].map((a) => ({ owner: a, signature: E.safeSignature(a, g4) }))])));
+ok(BigInt(await rpc("eth_getBalance", [newbie, "latest"])) === 3000n, "Instant Wallet shape: one wedgie press for both slots + the wallet sends ETH");
+
 // a wrong wedgie signature must not pass
 const t3 = { ...t2, nonce: 1 };
 const bad = wedgieSign(E.safeTxHash(chain, solo, t2));          // signed the old nonce
