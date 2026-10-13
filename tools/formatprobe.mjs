@@ -30,7 +30,7 @@ function expected(file, family) {
 
 const ATECC = { type: "ATECC608", serial: "0123abcd4455667788", revision: "00006002", configLocked: true, dataLocked: true };
 const TM = { type: "OPTIGA Trust M", state: "08800000", uid: "cd16336601001c000100000000000000000000000000000000000000" };
-const ALLPASS = ["pass", "pass", "pass", "pass", "pass"];
+const ALLPASS = ["pass", "pass", "pass", "skip", "pass", "pass"];   // Shake: Trust M only
 // pid: the chip (3 = RP2040, 15 = RP2350). wifi: the board has the Pico W's WiFi chip. used: it starts
 // as a wedgie on 0.1.1. combo: the joystick's UP comes with IN once. unplugAt: pulled out at that button.
 const scenarios = [
@@ -41,8 +41,11 @@ const scenarios = [
   { name: "used-saves", pid: 3, used: true, saves: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "used-wipe", pid: 3, used: true, saves: true, wipe: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "sticky-joy", pid: 3, combo: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
-  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
-  { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "fail", "skip"]], uf2: "RPI_PICO" },
+  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "skip", "pass", "pass"]], uf2: "RPI_PICO" },
+  { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "skip", "fail", "skip"]], uf2: "RPI_PICO" },
+  // A Trust M: its chip check fails here (a fake can't chain to Infineon), the shake still runs.
+  { name: "trustm-shake", pid: 3, found: [TM], want: ["FAIL", ["pass", "pass", "fail", "pass", "pass", "pass"]], uf2: "RPI_PICO" },
+  { name: "trustm-loose", pid: 3, found: [TM], loose: true, want: ["FAIL", ["pass", "pass", "fail", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
   { name: "no-profile", pid: 3, noProfile: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "connect-new", page: "connect", pid: 3, found: [ATECC], uf2: "RPI_PICO" },
   { name: "connect-pico2-w", page: "connect", pid: 15, wifi: true, found: [ATECC], uf2: "RPI_PICO2_W", flashes: 2 },
@@ -117,11 +120,24 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         t += 40; setTimeout(() => push('@benchDone {}\r\n\x04\x04>'), t);
         return;
       }
+      if (c.startsWith("shake(")) {
+        let t = 0;
+        const ev = (s) => { t += 40; setTimeout(() => live && push(s + "\r\n"), t); };
+        push("OK");
+        for (const hz of [400000, 1000000]) {
+          const v = { hz, ops: 900, miss: sc.loose ? 40 : 0, err: sc.loose ? 3 : 0, bad: sc.loose ? 1 : 0 };
+          ev("@shake " + JSON.stringify({ ...v, left: 3 }));
+          ev("@shook " + JSON.stringify({ ...v, last: sc.loose ? "read not acked" : "" }));
+        }
+        t += 40; setTimeout(() => push("\x04\x04>"), t);
+        return;
+      }
       if (c.startsWith("verdict(")) { st.verdict = c; return answer(""); }
       // the chip used, not locked (bench.py chipwork): ATECC608 hashes the page's random bytes. (Trust M's
       // answer needs a certificate chaining to Infineon, which a fake can't sign, so no scenario uses it here.)
       if (c.startsWith("chipwork(")) {
         const m = crypto.getRandomValues(new Uint8Array(100));
+        if (sc.found[0]?.type === "OPTIGA Trust M") return answer("@chipwork " + JSON.stringify({ kind: "trustm", msg: hex(m), error: "a fake has no Infineon certificate" }) + "\r\n");
         return answer("@chipwork " + JSON.stringify({ kind: "atecc", msg: hex(m), sha: await sha(m), random: ["ffff0000".repeat(8), "ffff0000".repeat(8)], serial: ATECC_SERIAL, configLocked: true, dataLocked: true }) + "\r\n");
       }
       if (c.includes("@hashes")) {
@@ -256,7 +272,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
   if (sc.page === "connect") { await connectRun(sc, ctx, page, errs); await ctx.close(); continue; }
-  await page.goto(base + "test");     // the old name: it lands on /format
+  await page.goto(base + "test");     // /test is /format
   const notes = [];
   if (sc.wipe) await page.check("#t-wipe");
   if (!sc.noProfile) {
@@ -264,7 +280,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     await page.waitForTimeout(1500);
     const before = await page.evaluate(() => ({ path: location.pathname, flashes: window.__st.flashes, wiped: !!window.__st.wiped, maxWrite: window.__st.maxWrite, execs: window.__st.execs }));
     if (before.flashes || before.wiped || before.maxWrite || before.execs) notes.push("STARTED BEFORE FORMAT " + JSON.stringify(before));
-    if (before.path !== "/format") notes.push("not on /format: " + before.path);
+    if (before.path !== "/test") notes.push("not on /test: " + before.path);
     await page.click("#t-go");
   }
   if (sc.noProfile) {   // tap whatever the page asks for, and count the taps

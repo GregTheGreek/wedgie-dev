@@ -274,3 +274,83 @@ def chipwork(kind):
     except Exception as e:
         d["error"] = str(e) or type(e).__name__
     out("chipwork", d)
+
+
+# --- the Trust M's wires, shaken ----------------------------------------------
+_miss = [0]
+
+
+def _w(d):
+    import trustm
+    for _ in range(trustm.TRIES):
+        try:
+            trustm.i2c.writeto(trustm.ADDR, d)
+            time.sleep_us(trustm.GUARD_US)
+            return
+        except OSError:
+            _miss[0] += 1
+            time.sleep_ms(1)
+    raise OSError("write not acked")
+
+
+def _r(n):
+    import trustm
+    for _ in range(trustm.TRIES):
+        try:
+            r = trustm.i2c.readfrom(trustm.ADDR, n)
+            time.sleep_us(trustm.GUARD_US)
+            return r
+        except OSError:
+            _miss[0] += 1
+            time.sleep_ms(1)
+    raise OSError("read not acked")
+
+
+def shake(speeds):
+    """Hammer the Trust M while its person shakes the wedgie: 200 bytes of its certificate and 32 random
+    bytes, over and over, each answer checked. Counts every try the wires missed (trustm.py retries those
+    quietly), every error and every wrong answer. speeds: [[Hz, seconds], ...]. Never signs (the chip
+    slows itself down after many key uses)."""
+    import trustm
+    keep = trustm._write, trustm._read
+    trustm._write, trustm._read = _w, _r
+    total = sum(s for _, s in speeds)
+    gone = 0
+    try:
+        for hz, secs in speeds:
+            ops = err = bad = 0
+            last = ""
+            trustm.bus(4, 5, hz)
+            s = trustm.Session()
+            cert = s.get(0xE0E0, 0, 200)
+            prev = b""
+            _miss[0] = 0
+            t0 = tl = time.ticks_ms()
+            _say("SHAKE IT", str(total - gone), _GREEN, _PAPER)
+            while time.ticks_diff(time.ticks_ms(), t0) < secs * 1000:
+                try:
+                    if ops % 4:
+                        r = s.random(32)
+                        ok = len(r) == 32 and r != prev
+                        prev = r
+                    else:
+                        ok = s.get(0xE0E0, 0, 200) == cert
+                    ops += 1
+                    bad += not ok
+                except Exception as e:
+                    err += 1
+                    last = str(e)[:40]
+                    try:
+                        s = trustm.Session()
+                    except Exception:
+                        pass
+                if time.ticks_diff(time.ticks_ms(), tl) >= 1000:
+                    tl = time.ticks_ms()
+                    left = total - gone - time.ticks_diff(tl, t0) // 1000
+                    _say("SHAKE IT", str(max(left, 0)), _RED if err or bad else _GREEN, _PAPER)
+                    out("shake", {"hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad, "left": left})
+            gone += secs
+            out("shook", {"hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad, "last": last})
+    finally:
+        trustm._write, trustm._read = keep
+        trustm.bus(4, 5)

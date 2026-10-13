@@ -1,4 +1,4 @@
-// /format (was /test): wipe a wedgie, set it up fresh, test it. Plug it in, press Format, do what its
+// /format (and /test): wipe a wedgie, set it up fresh, test it. Plug it in, press Format, do what its
 // own screen says, unplug. Nothing starts until Format is pressed (a wedgie plugged in here by mistake
 // keeps everything). A used wedgie's saves (/saves) are copied into this browser first and put back
 // after the new firmware goes on, unless "wipe its saves too" is ticked; a backup that couldn't be put
@@ -10,7 +10,10 @@
 //  3. the wedgie firmware (before the buttons, so unplugging at the end is safe; its chip drivers);
 //  4. the chip, used without locking it: ATECC608 hashes on-chip, Trust M signs and its certificate
 //     chains to Infineon (chipcheck.ts);
-//  5. on its screen: each button alone, in order; then each again, filling the screen with its color.
+//  5. a Trust M's wires, shaken: its person shakes the wedgie while the chip is hammered at 400 kHz, then
+//     at 1 MHz (the margin), every answer checked, every missed try counted (bench.py shake);
+//  6. on its screen: each button alone, in order; then each again, filling the screen with its color.
+// It ends with the latest firmware and no app (one gets picked at /connect).
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
 import { installCore, letIn } from "../serial/install";
@@ -24,7 +27,8 @@ const NAME: Record<string, string> = { up: "UP", down: "DOWN", left: "LEFT", rig
 const ICON: Record<State, string> = { waiting: "", running: "…", pass: "✓", fail: "✗", skip: "–" };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const RAW = "raw REPL; CTRL-B to exit\r\n>";
-const BOARD = 0, FW = 1, CHIP = 2, BUTTONS = 3, COLORS = 4;
+const BOARD = 0, FW = 1, CHIP = 2, SHAKE = 3, BUTTONS = 4, COLORS = 5;
+const SHAKE_AT: [number, number][] = [[400000, 20], [1000000, 6]];   // [Hz, seconds]: the wedgie's own speed, then the margin
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 
@@ -72,7 +76,7 @@ export function format(main: HTMLElement) {
     <div class="test-id" id="t-id"></div>
     <dl class="kv test-facts" id="t-facts" hidden></dl>
     <label class="fine test-wipe"><input type="checkbox" id="t-wipe"> Wipe its saves too</label>
-    <p class="fine">Format wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip and every button. Its saves are kept unless you tick the box.</p>
+    <p class="fine">Format wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip, its wires while you shake it, and every button. It ends with no app on it. Its saves are kept unless you tick the box.</p>
     ${benchSetup()}
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -80,7 +84,7 @@ export function format(main: HTMLElement) {
   const meter = $("t-meter"), fill = meter.querySelector<HTMLElement>(".meter-fill")!;
 
   const tests: { name: string; state: State; detail: string }[] =
-    ["Board", "Firmware", "Chip", "Buttons", "Colors"].map((name) => ({ name, state: "waiting", detail: "" }));
+    ["Board", "Firmware", "Chip", "Shake", "Buttons", "Colors"].map((name) => ({ name, state: "waiting", detail: "" }));
   const draw = () => {
     grid.innerHTML = tests.map((t) =>
       `<div class="test-card ${t.state}"><div class="test-icon">${ICON[t.state]}</div><div class="test-name">${t.name}</div><div class="test-detail">${esc(t.detail)}</div></div>`).join("");
@@ -253,7 +257,28 @@ export function format(main: HTMLElement) {
             k.facts.forEach(([a, b]) => fact(a, b));
             c = { ...c, pass: k.pass, detail: k.detail, short: k.pass ? c.short : "CHIP TEST" };
           }
-          set(CHIP, c.pass ? "pass" : "fail", c.detail); step = BUTTONS;
+          set(CHIP, c.pass ? "pass" : "fail", c.detail); step = SHAKE;
+
+          if (c.kind === "trustm") {
+            set(SHAKE, "running", "Shake it");
+            status("Shake it", "Shake, tap and squeeze the wedgie until its screen stops counting.");
+            const shook: any[] = [];
+            r.onLine = (t, v) => {
+              if (t === "shake") set(SHAKE, "running", `${v.hz / 1000} kHz · ${v.ops} checks · ${v.err + v.bad} errors · ${v.miss} retries · ${v.left} s`);
+              if (t === "shook") shook.push(v);
+            };
+            await r.exec(`shake(${JSON.stringify(SHAKE_AT)})`, 120000);
+            const [held, fast] = shook;
+            if (!held) throw new Error("No answer from the shake test");
+            const line = (v: any) => `${v.ops} checks, ${v.err} errors, ${v.bad} wrong, ${v.miss} retries${v.last ? ` (${v.last})` : ""}`;
+            fact("Shaken at 400 kHz", line(held));
+            if (fast) fact("At 1 MHz", line(fast));
+            const ok = !held.err && !held.bad && held.ops > 0;
+            set(SHAKE, ok ? "pass" : "fail", ok
+              ? `${held.ops} checks, all right${held.miss ? `, ${held.miss} retries` : ""} · 1 MHz ${fast && !fast.err && !fast.bad ? "ok" : "fails"}`
+              : `${held.err + held.bad} of ${held.ops + held.err} failed. A wire is loose.`);
+          } else set(SHAKE, "skip", c.pass ? "Trust M only" : "");
+          step = BUTTONS;
 
           status("Follow its screen", "Each button on its own, in order. Then each again for its color.");
           r.onLine = (t, v) => {
@@ -272,7 +297,7 @@ export function format(main: HTMLElement) {
           await r.exec(`bench(${c.pass ? "True" : "False"}, ${JSON.stringify(c.short)})`, 30 * 60 * 1000);
           if (tests[BUTTONS].state === "running") set(BUTTONS, "pass", buttonsLine());
           set(COLORS, "pass", "All 9 shown"); step = COLORS + 1;
-          const failed = tests.filter((t) => t.state !== "pass").map((t) => t.name.toUpperCase());
+          const failed = tests.filter((t) => t.state === "fail").map((t) => t.name.toUpperCase());
           await r.exec(`verdict(${failed.length ? "False" : "True"}, ${JSON.stringify(failed.join(" "))})`, 10000);
         } finally {
           progress(null);
@@ -289,7 +314,7 @@ export function format(main: HTMLElement) {
     busy = false;
     if (gone) { waitBoot = Date.now(); pick(); return; }
     for (let i = step + 1; i <= COLORS; i++) if (tests[i].state === "waiting") set(i, "skip", "");
-    const failed = tests.filter((t) => t.state !== "pass").map((t) => t.name);
+    const failed = tests.filter((t) => t.state !== "pass" && t.state !== "skip").map((t) => t.name);
     go = false;
     if (failed.length) status("FAIL", `${failed.join(", ")}. Unplug it.`, "bad");
     else status("PASS", `${w.short} is ready. Unplug it.`, "good");
