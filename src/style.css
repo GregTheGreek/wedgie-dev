@@ -24,7 +24,7 @@
   color-scheme: light;
 }
 * { box-sizing: border-box; }
-html { background: #fefefe; scroll-behavior: smooth; }
+html { background: #fefefe; scroll-behavior: smooth; touch-action: manipulation; }   /* fast taps (the order steppers) never double-tap zoom; pinch still zooms */
 html.ready { background: var(--paper); }
 html.noscroll { overflow: hidden; }
 body { margin: 0; font-family: var(--font); color: var(--ink); font-size: 17px; line-height: 1.55; font-weight: 500;
