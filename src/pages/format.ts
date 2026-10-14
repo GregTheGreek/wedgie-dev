@@ -16,9 +16,11 @@
 //  6. on its screen: each button alone, in order; the joystick's 4 diagonals (two directions, never IN);
 //     then each button again, filling the screen with its color.
 // It ends with the latest firmware and no app (one gets picked at /connect).
+// A wedgie already on the latest firmware also gets "Test only": steps 4-6, nothing wiped or written (the
+// second pass, once its case is on). A on its screen lets the page in; after, it goes back to its app.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { installCore, letIn } from "../serial/install";
+import { installCore, letIn, takeOver, firmwareManifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
@@ -198,8 +200,10 @@ export function format(main: HTMLElement) {
   }
 
   // ---- the bench ------------------------------------------------------------------------------------
-  async function run(w: W.Wedgie) {
+  // keep: "Test only" on a wedgie already on the latest firmware: no wipe, no install, its app comes back.
+  async function run(w: W.Wedgie, keep = false) {
     busy = true;
+    if (keep) reset();
     tested.add(w.key);
     flashedAt = 0;
     status("Testing…", "Don't unplug it.");
@@ -213,7 +217,9 @@ export function format(main: HTMLElement) {
     try {
       await W.withRepl(w, async (r) => {
         try {
-          await r.enter();
+          if (keep) await takeOver(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer test it."), "Test it", "Testing");
+          else await r.enter();
+          status("Testing…", "Don't unplug it.");
           await r.exec(await W.probe(), 10000);
           await r.exec(await benchPy(), 10000);
 
@@ -226,7 +232,7 @@ export function format(main: HTMLElement) {
           fact("MicroPython", `${b.mp}${b.wbuild ? " (WiFi build)" : ""}`); fact("WiFi MAC", b.mac);
           fact("Storage", `${Math.round(b.fs / 1024)} KB files · ${Math.round(b.heap / 1024)} KB RAM`);
           idLine(b.uid, name);
-          if (b.wifi && !b.wbuild) {
+          if (b.wifi && !b.wbuild && !keep) {
             wantWifi = true; gone = true;
             set(BOARD, "running", `${name}: getting the WiFi MicroPython`);
             await r.write("import machine\nmachine.bootloader()\x04");
@@ -235,22 +241,26 @@ export function format(main: HTMLElement) {
           if (b.wbuild && !b.wifi) fact("WiFi", `didn't start: ${b.wifiError || "?"}`);
           set(BOARD, "pass", `${name} · ${b.uid.slice(-6).toUpperCase()}`); step = FW;
 
-          set(FW, "running", "Installing");
-          status("Installing the wedgie firmware…", "Don't unplug it.");
-          progress(0);
-          const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; its app gets picked at /connect
-          progress(null);
-          const kept = backup(b.uid);
-          if (kept && !($("t-wipe") as HTMLInputElement).checked) {
-            status("Putting its saves back…", "Don't unplug it.");
-            await FS.busy(r, "Putting saves back");
-            const n = await FS.restore(r, kept);
-            try { localStorage.removeItem(SAVES(b.uid)); } catch {}
-            fact("Saves", `${n} file${n === 1 ? "" : "s"} put back`);
+          if (keep) set(FW, "pass", `wedgie ${w.version}, kept`);
+          else {
+            set(FW, "running", "Installing");
+            status("Installing the wedgie firmware…", "Don't unplug it.");
+            progress(0);
+            const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; its app gets picked at /connect
+            progress(null);
+            const kept = backup(b.uid);
+            if (kept && !($("t-wipe") as HTMLInputElement).checked) {
+              status("Putting its saves back…", "Don't unplug it.");
+              await FS.busy(r, "Putting saves back");
+              const n = await FS.restore(r, kept);
+              try { localStorage.removeItem(SAVES(b.uid)); } catch {}
+              fact("Saves", `${n} file${n === 1 ? "" : "s"} put back`);
+            }
+            set(FW, "pass", `wedgie ${got.version}`);
+            await r.exec(await W.probe(), 10000);        // load the bench again (the install ran its own code)
+            await r.exec(await benchPy(), 10000);
           }
-          set(FW, "pass", `wedgie ${got.version}`); step = CHIP;
-          await r.exec(await W.probe(), 10000);        // load the bench again (the install ran its own code)
-          await r.exec(await benchPy(), 10000);
+          step = CHIP;
 
           set(CHIP, "running", "Asking it over I2C");
           status("Testing the chip…", "Using it, not locking it.");
@@ -317,7 +327,7 @@ export function format(main: HTMLElement) {
           await r.exec(`verdict(${failed.length ? "False" : "True"}, ${JSON.stringify(failed.join(" "))})`, 10000);
         } finally {
           progress(null);
-          if (!gone) await r.leave();   // it boots into the wedgie firmware
+          if (!gone) await r.leave(keep ? { reset: false } : {});   // it boots into the wedgie firmware (keep: LEAVE, back to its app)
         }
       });
     } catch (e: any) {
@@ -381,7 +391,7 @@ export function format(main: HTMLElement) {
     const next = ws.find((w) => w.state === "ready" && !done(w));
     if (next) {
       if (flashedAt && Date.now() - flashedAt < 90000) return void run(next);
-      if (!go) return ask(`${next.short || "A wedgie"} · ${next.board || ""}`, next.uid);
+      if (!go) return ask(`${next.short || "A wedgie"} · ${next.board || ""}`, next.uid, next);
       reset();
       idLine(next.uid || "", next.board || "");
       return void toBoot(next);
@@ -423,11 +433,18 @@ export function format(main: HTMLElement) {
     if (!flashedAt && !waitBoot && !actions.innerHTML && !justEnded) idle();
   }
   // A unit is plugged in: nothing happens to it until Test it is pressed.
-  function ask(what: string, uid?: string) {
+  // On the latest firmware it can also be tested as it is (chip, shake, buttons, colors), nothing wiped.
+  function ask(what: string, uid?: string, w?: W.Wedgie) {
     const kept = backup(uid);
-    status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.` : "Test it wipes it, sets it up fresh, then tests it.");
-    if (!document.getElementById("t-go")) buttons(`<button class="btn btn-green" id="t-go">Test it</button>`);
+    const current = !!w && w.kind === "wedgie" && !!latest && w.version === latest;
+    status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.`
+      : current ? `It has the latest firmware (${latest}). Test only checks the chip, shake, buttons and colors and changes nothing. Format and test wipes it and sets it up fresh first.`
+      : "Test it wipes it, sets it up fresh, then tests it.");
+    if (!document.getElementById("t-go") || !!document.getElementById("t-test") !== current)
+      buttons(current ? `<button class="btn btn-green" id="t-test">Test only</button><button class="btn" id="t-go">Format and test</button>`
+        : `<button class="btn btn-green" id="t-go">Test it</button>`);
     $("t-go").onclick = () => { go = true; buttons(""); pick(); };
+    if (current) $("t-test").onclick = () => { buttons(""); void run(w!, true); };
   }
   // Without the profile, the first sight of a unit needs a tap.
   function idle() {
@@ -435,6 +452,8 @@ export function format(main: HTMLElement) {
     $("t-new").onclick = (e) => { e.preventDefault(); pickBoot().then(() => pick(), () => {}); };
     $("t-used").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
   }
+
+  let latest = "";                // the latest firmware's version: a wedgie on it can be tested as it is
 
   draw();
   if (!W.supported() || !usbSupported()) {
@@ -448,6 +467,7 @@ export function format(main: HTMLElement) {
   W.start();
   idle();
   pick();
+  firmwareManifest().then((m) => { latest = m.version; pick(); }, () => {});
   // A deploy while the bench is open leaves this page with an old manifest, and the next unit fails
   // ("lcd.py didn't copy cleanly"). So between units (nothing plugged in, nothing under way) it reloads.
   const first = fetch("/fw/manifest.json", { cache: "no-cache" }).then((r) => r.text()).catch(() => "");
