@@ -64,7 +64,7 @@ export function format(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Test a wedgie</h1>
-    <p class="test-safe">This wipes and resets the computer. It never changes the chip. Your crypto is safe.</p>
+    <p class="test-safe">This wipes and resets the computer. It never changes the chip. Your crypto stays safe.</p>
     <div class="boot-hint card" id="t-hint" hidden>
       <div class="boot-hint-3d" id="t-hint-3d"></div>
       <div><h3>Hold BOOTSEL, plug it in</h3>
