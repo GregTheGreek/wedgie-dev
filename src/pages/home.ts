@@ -1,6 +1,7 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
 import { ITEMS, type Item } from "../shop/catalog";
+import { WHY, STAR, wire } from "../shop/why";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
@@ -77,7 +78,9 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card order">
       <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
-        <div class="order-price"><i class="sixseven-box"></i>$67 <span>shipped</span></div>
+        <div class="order-price"><i class="sixseven-box"></i><b class="list">$67</b>${STAR} <span>shipped</span></div>
+        <p class="surge" hidden></p>
+        ${WHY}
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
@@ -126,7 +129,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
   let hands: { play(): void } | null = null;
   new IntersectionObserver(async (es) => {
-    if (!es.some((e) => e.isIntersecting) || extra > 0) return;
+    if (!es.some((e) => e.isIntersecting) ) return;
     await pageShown;
     if (!hands) { const { mountSixSeven } = await import("../ui/sixseven"); hands = mountSixSeven(price.querySelector(".sixseven-box")!); }
     hands.play();
@@ -138,12 +141,14 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   // The price right now: each sale adds a bit, gone in a day without one (shop/catalog.ts).
   const showPrice = () => {
-    price.querySelector<HTMLElement>(".sixseven-box")!.hidden = extra > 0;   // no 6-7 once it isn't $67
-    const c = ITEMS[item].cents + extra;
-    price.firstChild!.nextSibling!.textContent = `${usd(c)} `;
-    main.querySelector("#buy-one")!.textContent = `Buy one · ${usd(ITEMS.wedgie.cents + extra)}`;
+    // Always the list price, then the demand price on top, in green, when there is one (shop/why.ts).
+    price.querySelector(".list")!.textContent = usd(ITEMS[item].cents);
+    const surge = main.querySelector<HTMLElement>(".surge")!;
+    surge.hidden = !extra;
+    surge.textContent = `+${usd(extra)} right now`;
   };
   fetch("/api/order").then((r) => r.json()).then((r) => { extra = r.extra || 0; showPrice(); }, () => {});
+  wire(price.parentElement!);
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });

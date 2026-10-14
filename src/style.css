@@ -655,3 +655,11 @@ body.dock-running #s-msg { display: none; }
 .order-fields .fine { font-weight: 400; }
 @media (max-width: 560px) { .order-fields { grid-template-columns: 1fr 1fr; } .order-fields label:nth-of-type(4) { grid-column: 1 / -1; } }
 .iw-mark { width: 22px; height: auto; vertical-align: middle; margin-right: 6px; align-self: center; }
+
+/* the price's green * and its "why" box (src/shop/why.ts) */
+.star { border: 0; background: none; padding: 0 2px; color: var(--mint-d); font: inherit; font-weight: 900; cursor: pointer; vertical-align: super; font-size: .5em; }
+.order-line .star { font-size: 1em; vertical-align: baseline; }
+.surge { color: var(--mint-d); font-weight: 800; }
+p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--mint-d); }
+.why { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--recess); box-shadow: var(--recess-shadow); max-width: 520px; text-align: left; }
+.why p { margin: 6px 0; }

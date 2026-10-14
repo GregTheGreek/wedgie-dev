@@ -5,8 +5,9 @@
 // finds it on chain. A quote holds 10 minutes (USDC) or 30 (card), with a countdown; then it's expired.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, BUMP, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import qrcode from "qrcode-generator";
+import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
 
@@ -61,7 +62,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         </div>`).join("")}
       <p class="order-total"><b id="o-total"></b> <span class="fine">shipped. ${esc(SHIPS)}</span></p>
       <p class="fine" id="o-lines" hidden></p>
-      <p class="fine">Each sale adds ${usd(BUMP)}. A day with none and it's back to ${usd(ITEMS.wedgie.cents)}.</p>
+      ${WHY}
     </div>
     <div class="safe-box recess" id="o-ship">
       <h2>Ship to</h2>
@@ -91,7 +92,8 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => {
       const k = l.dataset.item as Item;
       l.querySelector(".n")!.textContent = String(cart[k]);
-      l.querySelector(".price")!.textContent = usd(ITEMS[k].cents + extra);
+      l.querySelector(".price")!.innerHTML = usd(ITEMS[k].cents) + (extra ? ` <span class="surge">+${usd(extra)} surge</span>` : "") + STAR;
+      wire(box);
     });
     box.querySelector("#o-total")!.textContent = usd(cartCents(cart, extra));
     const lines = cartLines(cart, extra), el = box.querySelector<HTMLElement>("#o-lines")!;
