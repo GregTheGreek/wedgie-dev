@@ -37,7 +37,11 @@ try:
     from machine import Pin
     _SCRATCH = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x0C  # WATCHDOG SCRATCH0
     _MARK = 0x57ED61E0
-    if machine.mem32[_SCRATCH] == _MARK:
+    _again = machine.mem32[_SCRATCH + 8] == 0xD21E     # scratch2: an install's last restart (job.restart)
+    machine.mem32[_SCRATCH + 8] = 0
+    if _again:                          # the drive back after an install: main.py adds it (here a soft reset's own
+        _drive_again = True             # USB setup, which runs after boot.py, would put the plain port back over it)
+    elif machine.mem32[_SCRATCH] == _MARK:
         print("drive: soft reset, left as is")
     elif not Pin(21, Pin.IN, Pin.PULL_UP).value():
         print("drive: skipped (Y held)")

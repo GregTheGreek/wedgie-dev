@@ -181,6 +181,18 @@ def resume(j):
         W.failed(j.get("id"), e)
     time.sleep_ms(100)
     W.restarting = True
+    restart()
+
+
+def restart():
+    """The install's last restart. A soft reset takes the WEDGIE drive off USB (MicroPython drops a runtime USB
+    device) and boot.py only adds it at power-up, so this asks boot.py for it (scratch2 0xD21E): without it the
+    drive stayed gone after an update until a replug (Austin, 10-13)."""
+    import machine, sys
+    try:
+        machine.mem32[(0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x14] = 0xD21E
+    except Exception:
+        pass                                # (the emulator: no mem32)
     machine.soft_reset()
 
 
@@ -343,9 +355,8 @@ def run(mid, m, ask, show=None):
                 W.send({"id": qid, "type": "done", "version": version})
                 write = []
                 time.sleep_ms(100)
-                import machine
                 W.restarting = True         # main.py lets this SystemExit through
-                machine.soft_reset()
+                restart()
                 return                      # (the emulator's soft_reset returns: it restarts once this does)
             elif t == "abort":
                 W.send({"id": qid, "type": "ok"})

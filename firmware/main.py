@@ -73,6 +73,12 @@ try:
         import job
         job.resume(_j)                  # ends in a restart, whatever happens
     del _j
+    if globals().get("_drive_again"):   # boot.py: an install's last restart. Add the WEDGIE drive back (wedgiedrive.py)
+        try:
+            import wedgiedrive
+            wedgiedrive.start()
+        except Exception as e:
+            print("drive:", e)
     import loader
     _a = wedgie.active()
     wedgie.lines()                      # the USB line buffer (6 KB), while the heap is whole

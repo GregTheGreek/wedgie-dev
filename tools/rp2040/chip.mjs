@@ -55,6 +55,17 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
     if (head === pending.length) { pending.length = 0; head = 0; }
   };
   attach();
+  // A re-enumeration with the controller already on (MicroPython's runtime USB after a soft reset: the WEDGIE drive
+  // back after an install, 0.3.47) only drops and raises the D+ pull-up, which rp2040js ignores: it reconnects its
+  // host only when MAIN_CTRL turns the controller on. A real host sees a replug, so a rising pull-up is one here too.
+  const sie = mcu.usbCtrl.handleSieCtrlWrite.bind(mcu.usbCtrl);
+  let pullup = false;
+  mcu.usbCtrl.handleSieCtrlWrite = (v) => {
+    sie(v);
+    const up = !!(mcu.usbCtrl.sieCtrl & (1 << 16));       // SIE_CTRL_PULLUP_EN
+    if (up && !pullup && mcu.usbCtrl.mainCtrl & 1 && !mcu.usbCtrl.hostMode) mcu.usbCtrl.onUSBEnabled?.();
+    pullup = up;
+  };
   mcu.core.PC = 0x10000000;
   return {
     mcu,
