@@ -665,3 +665,26 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .why { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--recess); box-shadow: var(--recess-shadow); max-width: 520px; text-align: left; }
 .why p { margin: 6px 0; }
 .safe-ui { float: right; }
+/* Safe signer: a paper contract that signs itself as it scrolls by (home.ts deed, --p 0..1). */
+.signer { display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; align-items: center; }
+.signer h2 { margin: 0; }
+.signer p { color: #474947; margin: 12px 0 18px; }
+.deed { --p: 0; max-width: 420px; justify-self: center; width: 100%; transform: rotate(1.5deg); filter: drop-shadow(0 14px 18px rgba(20,20,20,.18)); }
+.deed svg { display: block; width: 100%; height: auto; }
+.deed-paper { fill: #fbf8ef; stroke: #e6e0cc; }
+.deed text { font-family: var(--font); }
+.deed-t { text-anchor: middle; font: 900 26px var(--font); fill: var(--ink); letter-spacing: .02em; }
+.deed-s { text-anchor: middle; font-size: 14px; font-weight: 700; fill: var(--muted); }
+.deed-l { font-size: 16px; font-weight: 700; fill: var(--ink); }
+.deed-line { stroke: #9a9583; stroke-width: 1.2; }
+.deed-o { font-size: 12px; font-weight: 800; fill: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.deed-ink { fill: none; stroke: #23408e; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: clamp(0, calc(1 - var(--p) / .35), 1); }
+.deed-key, .deed-wedgie { transform-box: fill-box; transform-origin: center; }
+.deed-key { opacity: min(clamp(0, calc((var(--p) - .3) * 10), 1), clamp(0, calc((.62 - var(--p)) * 12), 1)); }
+.deed-wedgie { opacity: clamp(0, calc((var(--p) - .55) * 10), 1); scale: clamp(.4, calc(.4 + (var(--p) - .55) * 6), 1); }
+.deed-check { stroke-dasharray: 1; stroke-dashoffset: clamp(0, calc(1 - (var(--p) - .72) * 8), 1); }
+.deed-by { font-size: 13px; font-weight: 800; fill: var(--mint-d); opacity: clamp(0, calc((var(--p) - .82) * 10), 1); }
+.deed-stamp { opacity: clamp(0, calc((var(--p) - .9) * 12), 1); }
+.deed-stamp text { text-anchor: middle; font: 900 22px var(--font); fill: #22c452; letter-spacing: .12em; }
+@media (max-width: 860px) { .signer { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .deed { --p: 1 !important; } }

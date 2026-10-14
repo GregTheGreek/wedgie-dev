@@ -70,6 +70,51 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
+  <section id="safe" class="sec">
+    <div class="card wide signer">
+      <div class="signer-copy">
+        <span class="kicker">Safe signer</span>
+        <h2>Sign for a Safe.</h2>
+        <p>A wedgie can be an owner on a Safe multisig, the same as a hardware wallet. It uses Safe's own contracts, already audited and holding billions. Nothing new to trust: the key never leaves the chip, and nothing signs until you press the green button.</p>
+        <div class="row"><a class="btn btn-sm" href="/safe">Use it with a Safe →</a></div>
+      </div>
+      <div class="deed" aria-hidden="true">
+        <svg viewBox="0 0 400 470">
+          <defs><pattern id="deed-rule" width="400" height="22" patternUnits="userSpaceOnUse"><path d="M0 21.5h400" stroke="#d9e4ea" stroke-width="1"/></pattern></defs>
+          <rect class="deed-paper" x="8" y="8" width="384" height="454" rx="6"/>
+          <rect x="24" y="150" width="352" height="296" fill="url(#deed-rule)"/>
+          <rect x="20" y="20" width="360" height="430" rx="3" fill="none" stroke="#c9c3ae" stroke-width="1.5"/>
+          <g class="deed-owl" transform="translate(200 62)">
+            <circle r="34" fill="none" stroke="#168c34" stroke-width="2.5"/><circle r="29" fill="none" stroke="#168c34" stroke-width="1" stroke-dasharray="2 3"/>
+            <path d="M-17 -16 L-11 -8 L0 -11 L11 -8 L17 -16 L18 6 Q16 22 0 24 Q-16 22 -18 6 Z" fill="#168c34"/>
+            <circle cx="-7.5" cy="0" r="6.5" fill="#fefefe"/><circle cx="7.5" cy="0" r="6.5" fill="#fefefe"/>
+            <circle cx="-7" cy="0.5" r="2.8" fill="#1a1b1a"/><circle cx="7" cy="0.5" r="2.8" fill="#1a1b1a"/>
+            <path d="M-3 7 L3 7 L0 12 Z" fill="#f2b632"/>
+          </g>
+          <text class="deed-t" x="200" y="122">Safe Contract</text>
+          <text class="deed-s" x="200" y="142">2 of 3 owners must sign</text>
+          <text class="deed-l" x="40" y="196">Send 1,000 USDC to vitalik.eth</text>
+          <g transform="translate(0 260)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 1</text>
+            <path class="deed-ink" pathLength="1" d="M52 -6 C60 -40 72 -40 70 -10 S80 -2 90 -22 C96 -34 100 -14 108 -12 C118 -10 120 -30 132 -26 C142 -22 130 -4 148 -8 C162 -12 170 -28 182 -20 C190 -14 196 -10 230 -18"/></g>
+          <g transform="translate(0 340)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 2</text>
+            <g class="deed-key" transform="translate(110 -24)"><circle r="13" fill="none" stroke="#b8902a" stroke-width="5"/><path d="M13 0h46v12M49 0v9" fill="none" stroke="#b8902a" stroke-width="5" stroke-linecap="round"/></g>
+            <g class="deed-wedgie" transform="translate(150 -24)">
+              <rect x="-62" y="-26" width="124" height="52" rx="14" fill="#2a2b2a"/><rect x="-60" y="-26" width="120" height="48" rx="13" fill="#fefefe" stroke="#d6d6d1"/>
+              <rect x="-22" y="-20" width="44" height="36" rx="3" fill="#1a1b1a"/><rect x="-19" y="-17" width="38" height="30" fill="#fefefe"/>
+              <rect x="-19" y="-17" width="38" height="2.5" fill="#22c452"/><rect x="-19" y="-14.5" width="38" height="2" fill="#a9aaab"/><rect x="-19" y="-12.5" width="38" height="2.5" fill="#e3312c"/>
+              <path class="deed-check" pathLength="1" d="M-8 1 L-2 7 L9 -5" fill="none" stroke="#22c452" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="-41" cy="-2" r="8" fill="#a9aaab"/><circle cx="-41" cy="-2" r="5" fill="#8a8b8c"/>
+              <circle cx="35" cy="-10" r="4.2" fill="#a9aaab"/><circle cx="35" cy="6" r="4.2" fill="#a9aaab"/>
+              <circle cx="47" cy="-10" r="4.2" fill="#22c452"/><circle cx="47" cy="6" r="4.2" fill="#e3312c"/>
+            </g>
+            <text class="deed-by" x="228" y="-18">signed on a wedgie</text></g>
+          <g transform="translate(0 420)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 3</text></g>
+          <g class="deed-stamp" transform="translate(296 402) rotate(-12)"><rect x="-62" y="-22" width="124" height="44" rx="6" fill="none" stroke="#22c452" stroke-width="4"/><text x="0" y="8">EXECUTED</text></g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
   <section id="get" class="sec">
     <div class="sec-head">
       <span class="kicker">Get one</span>
@@ -160,6 +205,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelector<HTMLAnchorElement>("#order-go")!.href = kit ? "/order?item=kit" : "/order";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
+  deed(main.querySelector<HTMLElement>(".deed")!);
   library(main.querySelector<HTMLElement>("#lib")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
     new IntersectionObserver(async (es, o) => {
@@ -200,6 +246,19 @@ function assembly(box: HTMLElement) {
       update();
     } catch (err) { console.error("assembly:", err); }
   }, { rootMargin: "400px" }).observe(stage);
+}
+
+// The Safe contract signs itself as it scrolls by: owner 1's ink, then owner 2's key turns into a wedgie,
+// its screen checks, and the 2-of-3 stamp lands. --p (0..1) drives it all in CSS.
+function deed(box: HTMLElement) {
+  const update = () => {
+    const r = box.getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (innerHeight * 0.9 - r.top) / Math.max(1, r.height - innerHeight * 0.08)));   // done once it all shows
+    box.style.setProperty("--p", p.toFixed(3));
+  };
+  addEventListener("scroll", update, { passive: true });
+  addEventListener("resize", update);
+  update();
 }
 
 // The software library: the shelf's carts stand side by side like books, and scrolling flips through them,
