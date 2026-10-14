@@ -7,7 +7,7 @@
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, type Order } from "./_shop.js";
 
-const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number) });
+const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
 export async function GET() {
   const extra = env("SHOP_DATABASE_URL") ? await extraNow(await db()).catch(() => 0) : 0;
@@ -42,7 +42,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   if (b.pay === "usdc") {
     if (!o.usdc) return oops("USDC checkout isn't open yet.", 503);
     const chain = Number(b.chain);
-    if (!PAY_CHAINS[chain]) return oops("Pick a chain.");
+    if (!open().chains.includes(chain)) return oops("Pick a chain.");
     const head = Number(BigInt(await rpc(chain, "eth_blockNumber", [])));
     // The last 4 digits (under a cent) name the order: unique among open orders on that chain.
     for (let i = 0; i < 8; i++) {

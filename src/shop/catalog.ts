@@ -39,12 +39,16 @@ export function cartOk(c: unknown): c is Cart {
   return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0);
 }
 
-// USDC: the same contract kind (6 decimals) on each chain the shop takes. Base only: the shop's Safe isn't on
-// Ethereum yet (add it back here once it is). The server reads the chain through SHOP_RPC_<chainId>.
+// USDC (Circle's own, 6 decimals) on each chain the shop takes, all paid to the shop's Safe (the same address
+// on every one: a chain goes here only once the Safe is deployed there). The server reads each chain through
+// SHOP_RPC_<chainId>. secs: block time, to find a payment's blocks; confirm: blocks to wait.
 // A USDC quote holds for QUOTE; a card one for Stripe's shortest checkout, 30 minutes.
 export const QUOTE = 10 * 60_000, CARD_QUOTE = 30 * 60_000;
 export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: string; confirm: number; secs: number }> = {
   8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 3, secs: 2 },
+  1: { name: "Ethereum", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", scan: "https://etherscan.io", confirm: 2, secs: 12 },
+  42161: { name: "Arbitrum", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", scan: "https://arbiscan.io", confirm: 20, secs: 0.25 },
+  10: { name: "Optimism", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", scan: "https://optimistic.etherscan.io", confirm: 3, secs: 2 },
 };
 
 // What the buyer types, sealed in their browser (seal.ts) before it leaves it.

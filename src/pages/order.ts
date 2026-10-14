@@ -81,8 +81,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <h2>Pay</h2>
       <p class="row"><button class="btn" id="o-card" disabled>Pay by card</button></p>
       <p class="row"><button class="btn btn-green" id="o-usdc" disabled>Pay in USDC</button>
-        on <select id="o-chain"${Object.keys(PAY_CHAINS).length < 2 ? " hidden" : ""}>${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
-        ${Object.keys(PAY_CHAINS).length < 2 ? esc(Object.values(PAY_CHAINS)[0].name) : ""}</p>
+        on <select id="o-chain">${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></p>
       <p class="fine" id="o-open">Checking the shop.</p>
     </div>
     ${yours.length ? `<div class="safe-box recess"><h2>Your orders</h2><p>${yours.map(([i]) => `<a href="/order/${esc(i)}">${esc(i)}</a>`).join(" · ")}</p></div>` : ""}`;
@@ -111,7 +110,10 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
-  api().then((r) => { shop = SEAL_KEY ? r : { card: false, usdc: false }; extra = r.extra || 0; paint(); }, () => {}).finally(() => {
+  api().then((r) => {
+    shop = SEAL_KEY ? r : { card: false, usdc: false }; extra = r.extra || 0; paint();
+    box.querySelectorAll<HTMLOptionElement>("#o-chain option").forEach((o) => { if (!r.chains?.includes(Number(o.value))) o.remove(); });   // only chains the server can read
+  }, () => {}).finally(() => {
     card.disabled = !shop.card; crypto.disabled = !shop.usdc;
     openEl.textContent = shop.card || shop.usdc ? "" : "Checkout opens soon.";
     openEl.hidden = !openEl.textContent;
