@@ -121,7 +121,9 @@ await ctx.route("https://mainnet.base.org/**", async (r) => {
 const txs = new Map();
 const known = [mine];      // Safes the fake API can list     // safeTxHash -> the API's multisig transaction
 const sigOwner = (sig) => (E.bytes(sig)[64] === 0 ? E.checksum("0x" + sig.slice(26, 66)) : E.checksum(me));   // contract: r = owner; EOA: the one wallet here
+let safeDown = false;      // step 3c: Safe's service is down
 await ctx.route("https://api.safe.global/**", async (r) => {
+  if (safeDown) return r.fulfill({ status: 503, headers: { "access-control-allow-origin": "*" }, body: "down" });
   const u = new globalThis.URL(r.request().url()), p = u.pathname.replace(/^\/tx-service\/\w+\/api\/v1/, ""), cors = { "access-control-allow-origin": "*" };
   const json = (b, status = 200) => r.fulfill({ status, headers: cors, contentType: "application/json", body: JSON.stringify(b) });
   let m;
@@ -149,6 +151,22 @@ await ctx.route("https://api.safe.global/**", async (r) => {
     return json({ safes: out });
   }
   json({}, 404);
+});
+
+// Instant Wallet's shared queue (instantwallet.io/api/safe/queue), in memory: merges signatures by owner
+const iwq = new Map();     // safe -> safeTxHash -> { tx, hash, sigs }
+await ctx.route("https://instantwallet.io/api/safe/queue**", async (r) => {
+  const json = (b, status = 200) => r.fulfill({ status, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" }, contentType: "application/json", body: JSON.stringify(b) });
+  if (r.request().method() === "OPTIONS") return json({}, 204);
+  if (r.request().method() === "POST") {
+    const b = JSON.parse(r.request().postData()), q = iwq.get(b.safe.toLowerCase()) || new Map(), h = E.safeTxHash(8453, b.safe, b.tx);
+    const e = q.get(h) || { tx: b.tx, hash: h, sigs: [] };
+    for (const s of b.sigs) if (!e.sigs.some((x) => eq(x.owner, s.owner))) e.sigs.push(s);
+    q.set(h, e); iwq.set(b.safe.toLowerCase(), q);
+    return json({ ok: true, hash: h });
+  }
+  const safe = new globalThis.URL(r.request().url()).searchParams.get("safe"), n = await num(safe, "nonce()");
+  json({ txs: [...(iwq.get(safe.toLowerCase())?.values() || [])].filter((e) => +e.tx.nonce >= n) });
 });
 
 let bad = 0;
@@ -187,7 +205,9 @@ await wait(() => !/Checking/.test(document.querySelector("#s-wedgie").textConten
 check(/Not set up on Base yet/.test(await page.textContent("#s-wedgie")), "the wedgie: not set up on Base yet");
 if (out) await page.screenshot({ path: `${out}/safe-1-add.png`, fullPage: true });
 await page.click("#a-go");
-await says(/Done: add owner/, "added");
+await says(/Press Execute/, "add owner signed");     // nothing runs by itself after the sign (e11ce5a): Execute
+await page.click("[data-exec]");
+await says(/Done: it ran/, "added");
 check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's signer is an owner");
 check((await rpc("eth_getCode", [signer, "latest"])).length > 2, "on chain: its signer contract was deployed first");
 check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Set up on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, set up, Add box gone");
@@ -225,7 +245,9 @@ await dapp.disconnect({ topic: session.topic, reason: { code: 6000, message: "do
 // 2: 2 of 2, proposed by the wedgie: 1 of 2 is enough, so it runs at once
 await page.selectOption("#o-th", "2");
 await page.click("#o-th-go");
-await says(/Done: 2 of 2 must sign/, "threshold changed");
+await says(/Press Execute/, "threshold signed");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "threshold changed");
 check(await asks() === 2, "the wedgie was asked (safe_sign; the first was WalletConnect's)");
 check(await num(mine, "getThreshold()") === 2, "on chain: 2 of 2, on the wedgie's signature alone");
 
@@ -275,6 +297,28 @@ await says(/That's enough: press Execute/, "wallet signed the big one");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "big one executed");
 check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 6 KB call ran (wedgie's signature over pieces + wallet)");
+
+// 3c: Safe's service is down: the wedgie's signature goes to Instant Wallet's queue; a reload (this browser's copy
+// wiped) still shows it from there; the wallet signs, execute
+safeDown = true;
+const to2 = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.fill("#n-to", to2);
+await page.fill("#n-amt", "0.002");
+await page.click("#n-wedgie");
+await says(/In the queue with the wedgie's signature/, "queued with Safe's service down");
+check([...(iwq.get(mine.toLowerCase())?.values() || [])].some((e) => e.sigs.some((x) => eq(x.owner, signer))), "Safe's service down: the wedgie's signature is in Instant Wallet's queue");
+await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("wedgie.safe.q.")).forEach((k) => localStorage.removeItem(k)));
+await page.reload();
+await wait(() => /wedgie signed/.test(document.querySelector("#s-queue")?.textContent || ""), null, 40000, "the queued one, from Instant Wallet, after a reload");
+check(/Safe's service didn't answer/.test(await page.textContent("#s-queue")), "page: says Safe's service didn't answer, still shows the queue");
+await page.click("#w-go");      // a reload: the wallet connects again
+await wait(() => document.querySelector("[data-wsign]"), null, 20000, "Sign with wallet, after a reload");
+await page.click("[data-wsign]");
+await says(/That's enough: press Execute/, "wallet signed with Safe's service down");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "executed with Safe's service down");
+check(BigInt(await rpc("eth_getBalance", [to2, "latest"])) === 2n * 10n ** 15n, "on chain: 0.002 ETH sent with Safe's service down (Instant Wallet's queue)");
+safeDown = false;
 
 // 4: back to the list (no reload): the Safe is the wedgie's now. Then a new one: wallet + wedgie, 2 of 2
 await page.click('a[href="/safe"][data-nav]');

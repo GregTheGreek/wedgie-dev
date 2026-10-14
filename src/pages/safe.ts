@@ -37,6 +37,10 @@ const CHAINS: Record<number, Chain> = {
   11155111: { name: "Sepolia", key: "sep", rpc: "https://ethereum-sepolia-rpc.publicnode.com", scan: "https://sepolia.etherscan.io", usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", test: true },
 };
 const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chain].key}/api/v1`;
+// The queue lives in three places, so a slow or down Safe Transaction Service doesn't stop a Safe: Safe's API,
+// Instant Wallet's shared queue (mainnets; it checks each signature on chain), and this browser.
+const IWQ = "https://instantwallet.io/api/safe/queue";
+const SLOW_MS = 8000;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].key}:${safe}`;
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
 const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
@@ -46,6 +50,8 @@ async function get(url: string) {
   if (!r.ok) throw Object.assign(new Error(`Safe's API: ${r.status} ${(await r.text()).slice(0, 200)}`), { status: r.status });
   return r.json();
 }
+/** Give up on a slow answer: a busy service never holds the page. */
+const within = <T,>(p: Promise<T>, ms = SLOW_MS) => Promise.race([p, sleep(ms).then((): T => { throw new Error("no answer"); })]);
 async function post(url: string, body: unknown) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`Safe's API said no: ${r.status} ${(await r.text()).slice(0, 300)}`);
@@ -161,6 +167,7 @@ export function safe(main: HTMLElement) {
   const deployed: Record<number, boolean | undefined> = {};
   // this Safe on the other chains: there (true), not yet (false), unknown; recipe = how it was made, to make it again
   let copies: Record<number, boolean | undefined> = {}, recipe: E.Recipe | null = null;
+  let queueNote = "";        // which queue sources didn't answer just now
 
   // the old page's "last Safe" (it opened that one every time): moved into the list once the wedgie is read
   let oldSaved = "";
@@ -477,7 +484,8 @@ export function safe(main: HTMLElement) {
     const count = () => {                         // only the count: never rebuild the box under someone typing
       const n = 1 + new Set(owners().map((a) => a.toLowerCase()).filter((a) => a !== signer.toLowerCase())).size;
       th.innerHTML = threshOpts(n, Math.min(n, Math.max(+th.value || 2, 1)));
-      $("c-of").textContent = `of ${plural(n, "owner")}`;
+      const of = document.getElementById("c-of");   // an ENS name can resolve after the box is gone
+      if (of) of.textContent = `of ${plural(n, "owner")}`;
     };
     list.addEventListener("address", count);
     $("c-add").onclick = () => addRow().focus();
@@ -564,15 +572,15 @@ export function safe(main: HTMLElement) {
           await sleep(2000);
         }
       }
-      let qq: any[] = [];
-      try {
-        qq = (await get(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${i.nonce}&ordering=nonce&limit=20`)).results || [];
-      } catch (e: any) { if (e.status !== 404) throw e; }     // a Safe made seconds ago: Safe's API hasn't seen it yet
       if (c !== chain || a !== safeAddr) return;
-      info = i; queue = qq;
+      info = i;
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
+      paintAll();             // the Safe from the chain now; its queue as the sources answer
       checkCopies(c, a);
+      const q = await readQueue(c, a, i.nonce);
+      if (c !== chain || a !== safeAddr) return;
+      queue = q;
     } catch (e) { if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
     paintAll();
   }
@@ -608,6 +616,70 @@ export function safe(main: HTMLElement) {
     if (r.owners.some(mine)) remember(t, a);
     go(route(t, a));
     say(`Your Safe is on ${CHAINS[t].name} now, same address.`);
+  }
+
+  // ---- the queue: Safe's API + Instant Wallet's queue + this browser, merged by safeTxHash ----
+  const qKey = (c: number, a: string) => `wedgie.safe.q.${c}:${a.toLowerCase()}`;
+  const localQ = (c: number, a: string): Record<string, any> => { try { return JSON.parse(localStorage.getItem(qKey(c, a)) || "{}"); } catch { return {}; } };
+  const useIW = (c: number) => !CHAINS[c].test;
+  const TX_FIELDS = ["to", "value", "data", "operation", "safeTxGas", "baseGas", "gasPrice", "gasToken", "refundReceiver", "nonce"] as const;
+  const txOf = (t: any): E.SafeTx => Object.fromEntries(TX_FIELDS.map((k) => [k, k === "data" ? t.data || "0x" : t[k]])) as any;
+
+  async function readQueue(c: number, a: string, nonce: number): Promise<any[]> {
+    const all = new Map<string, any>();
+    const add = (t: any, sigs: { owner: string; signature: string | null }[], fromSafe = false) => {
+      if (+t.nonce < nonce) return;
+      const h = String(t.safeTxHash || t.hash).toLowerCase();
+      const m = all.get(h) || { ...txOf(t), safeTxHash: t.safeTxHash || t.hash, confirmations: [], confirmationsRequired: t.confirmationsRequired, dataDecoded: t.dataDecoded };
+      m.inSafe ||= fromSafe;
+      if (t.dataDecoded) m.dataDecoded = t.dataDecoded;
+      for (const s of sigs) if (!m.confirmations.some((x: any) => eqA(x.owner, s.owner))) m.confirmations.push(s);
+      all.set(h, m);
+    };
+    const missed: string[] = [];
+    await Promise.all([
+      within(get(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`))
+        .then((j) => (j.results || []).forEach((t: any) => add(t, t.confirmations || [], true)))
+        .catch((e: any) => { if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
+      useIW(c) ? within(fetch(`${IWQ}?chainId=${c}&safe=${a}`).then((r) => r.json()))
+        .then((j) => { if (j.error) throw new Error(j.error); (j.txs || []).forEach((t: any) => add({ ...t.tx, hash: t.hash }, t.sigs)); })
+        .catch(() => missed.push("Instant Wallet")) : null,
+    ]);
+    const mine = localQ(c, a);
+    for (const [h, t] of Object.entries(mine)) if (+t.nonce < nonce) delete mine[h]; else add(t, t.confirmations);
+    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
+    queueNote = missed.length ? `${missed.join(" and ")} didn't answer just now.` : "";
+    return [...all.values()].sort((x, y) => +x.nonce - +y.nonce);
+  }
+
+  /** A transaction and its signatures, everywhere the queue lives. Fine as long as one place took it. */
+  async function share(t: E.SafeTx, sigs: { owner: string; signature: string }[], known?: any) {
+    const c = chain, a = safeAddr, h = E.safeTxHash(c, a, t);
+    // the signatures already known (from either place) go along, so each place ends up with all of them
+    const all = [...(known?.confirmations || []).filter((x: any) => x.signature), ...sigs]
+      .filter((s, k, l) => l.findIndex((x) => eqA(x.owner, s.owner)) === k);
+    const mine = localQ(c, a), m = mine[h.toLowerCase()] || { ...txOf(t), safeTxHash: h, confirmations: [] };
+    for (const s of sigs) if (!m.confirmations.some((x: any) => eqA(x.owner, s.owner))) m.confirmations.push(s);
+    mine[h.toLowerCase()] = m;
+    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
+    const toSafe = async () => {
+      const had = (known?.inSafe ? known.confirmations : []).map((x: any) => x.owner);
+      let rest = all.filter((s) => !had.some((o: string) => eqA(o, s.owner)));
+      if (!known?.inSafe && rest.length) {
+        const [first, ...more] = rest;
+        await post(`${api(c)}/safes/${a}/multisig-transactions/`, { ...t, contractTransactionHash: h, sender: first.owner, signature: first.signature, origin: "wedgie.dev/safe" });
+        rest = more;
+      }
+      for (const s of rest) await post(`${api(c)}/multisig-transactions/${h}/confirmations/`, { signature: s.signature });
+    };
+    const toIW = async () => {
+      const r = await fetch(IWQ, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chainId: c, safe: a, tx: t, sigs: all, origin: "wedgie.dev/safe" }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Instant Wallet: ${r.status}`);
+    };
+    const got = await Promise.allSettled([within(toSafe()), useIW(c) ? within(toIW()) : Promise.reject(new Error("off"))]);
+    if (got.every((g) => g.status === "rejected"))
+      say("Saved in this browser only: Safe's service and Instant Wallet didn't take it. Other owners won't see it yet.", true);
   }
 
   // ---- add the wedgie as an owner, from a browser wallet that already is one ----
@@ -696,6 +768,7 @@ export function safe(main: HTMLElement) {
     }).join("");
     const ready = /data-exec/.test(items);
     box.innerHTML = `<h2>${ready ? "Ready: press Execute" : "Waiting to sign"}</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
+      ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button>
         <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Queue in Safe{Wallet} ↗</a>
         <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/history")}" target="_blank" rel="noopener">History ↗</a></p>`;
@@ -787,10 +860,7 @@ export function safe(main: HTMLElement) {
       return rc.transactionHash as string;
     }
     say("Putting it in the Safe's queue.");
-    const [sig, ...more] = sigs;
-    await post(`${api(chain)}/safes/${safeAddr}/multisig-transactions/`, { ...t, contractTransactionHash: E.safeTxHash(chain, safeAddr, t),
-      sender: sig.owner, signature: sig.signature, origin: "wedgie.dev/safe" });
-    for (const m of more) await post(`${api(chain)}/multisig-transactions/${E.safeTxHash(chain, safeAddr, t)}/confirmations/`, { signature: m.signature });
+    await share(t, sigs);
     await load(true);
     toQueue();
     const left = Math.max(0, info!.threshold - sigs.length);
@@ -801,11 +871,9 @@ export function safe(main: HTMLElement) {
 
   async function signQueued(t: any, who: "wedgie" | "wallet") {
     const sigs = who === "wedgie" ? await wedgieSig(t) : [await walletSig(t)];
-    if (E.safeTxHash(chain, safeAddr, t) !== t.safeTxHash) throw new Error("Safe's API has a different hash for this one: not sent.");
-    say("Sending the signature to Safe.");
-    const had = (t.confirmations || []).map((c: any) => c.owner);
-    for (const sig of sigs) if (!had.some((o: string) => eqA(o, sig.owner)))
-      await post(`${api(chain)}/multisig-transactions/${t.safeTxHash}/confirmations/`, { signature: sig.signature });
+    if (E.safeTxHash(chain, safeAddr, txOf(t)).toLowerCase() !== String(t.safeTxHash).toLowerCase()) throw new Error("The queue has a different hash for this one: not sent.");
+    say("Sending the signature.");
+    await share(txOf(t), sigs, t);
     await load(true);
     toQueue();
     const u = queue.find((x) => x.safeTxHash === t.safeTxHash);
