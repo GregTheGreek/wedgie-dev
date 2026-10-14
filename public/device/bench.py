@@ -87,19 +87,20 @@ def board():
 
 
 # --- the screen ------------------------------------------------------------
-# Drawn with one reused 11 KB stripe buffer and a line at a time, never a whole-screen allocation:
+# Drawn with one reused 3 KB stripe buffer and a line at a time, never a whole-screen allocation:
 # with the firmware loaded an RP2040 has ~25 KB free, and a draw that has to hunt for memory stalls
-# long enough to miss a quick button tap.
+# long enough to miss a quick button tap. /test's Test only runs over the loaded firmware and its cut-up
+# heap: an 11 KB stripe failed there ("allocating 11520"; 2026-10-14).
 _row = None
 
 
 def _fill(c):
     global _row
     if _row is None:
-        _row = bytearray(240 * 24 * 2)
-    framebuf.FrameBuffer(_row, 240, 24, framebuf.RGB565).fill(c)
-    for y in range(0, 240, 24):
-        _lcd.blit(0, y, 240, 24, _row)
+        _row = bytearray(240 * 6 * 2)
+    framebuf.FrameBuffer(_row, 240, 6, framebuf.RGB565).fill(c)
+    for y in range(0, 240, 6):
+        _lcd.blit(0, y, 240, 6, _row)
 
 
 def _text(s, scale, y, f, b):
@@ -341,7 +342,7 @@ def _r(n):
     raise OSError("read not acked")
 
 
-# The Pico's own load: a 4 KB block written and read back over and over (each sum must come out the
+# The Pico's own load: a 2 KB block written and read back over and over (each sum must come out the
 # same), on its second core while the first works the chip. Nothing allocated in the loop but range().
 _go = [0]           # 1: core 1 keeps pounding
 _core = [0, 0, 0]   # passes, wrong sums, 1 while running
@@ -388,7 +389,7 @@ def shake(plan):
     trustm._write, trustm._read = _w, _r
     total = sum(p[2] for p in plan)
     gone = 0
-    buf0, buf1 = bytearray(4096), bytearray(4096)
+    buf0, buf1 = bytearray(2048), bytearray(2048)   # small: Test only runs over the loaded firmware
     s = None
     try:
         for what, hz, secs in plan:
