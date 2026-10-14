@@ -82,7 +82,7 @@ async function newOrder(kits = 0) {
   await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202");
   await page.locator("#o-usdc").click();
   await page.waitForURL(/\/order\/[0-9a-f]{12}$/);
-  await page.getByText("Exact amount").waitFor();
+  await page.getByText("Copy amount").waitFor();
   return page.url().split("/").pop();
 }
 
@@ -90,7 +90,7 @@ async function newOrder(kits = 0) {
 const first = await newOrder(1);
 await shot("1-unpaid");
 const extra0 = (await (await fetch(SITE + "/api/order")).json()).extra, want = (6700 + 5700 + 500 + 2 * extra0) / 100;
-const amount = (await page.locator("text=Exact amount").innerText()).match(/([\d.]+) USDC/)[1];
+const amount = await page.locator("[data-copy]").first().getAttribute("data-copy");
 ok(Math.floor(Number(amount) * 100) / 100 === want && !/\.\d\d0000$/.test(amount), `asks for ${want} USDC plus a tag (${amount})`);
 ok(await page.locator(".order-qr svg").count() === 1 && /\d:\d\d/.test(await page.locator(".o-left").first().innerText()), "a QR code and a countdown");
 ok(sent.length && sent.every((b) => !b.includes(NAME) && !b.includes(STREET)), "the address never left the browser in clear");
@@ -107,7 +107,7 @@ ok(extra1 > extra0 + 900 && extra1 <= extra0 + 1000, `2 boxes sold: the price we
 
 // 3: pay like a phone wallet from the QR code would: a plain transfer, nothing pasted
 const second = await newOrder();
-const exact = BigInt((await page.locator("text=Exact amount").innerText()).match(/([\d.]+) USDC/)[1].replace(".", ""));
+const exact = BigInt((await page.locator("[data-copy]").first().getAttribute("data-copy")).replace(".", ""));
 await rpc("eth_sendTransaction", [{ from: me, to: USDC, data: "0xa9059cbb" + PAY_TO.slice(2).padStart(64, "0") + exact.toString(16).padStart(64, "0") }]);
 await rpc("anvil_mine", ["0x3"]);
 await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });

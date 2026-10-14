@@ -640,6 +640,9 @@ body.dock-running #s-msg { display: none; }
 .order-line { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 8px 0; }
 .order-line + .order-line { border-top: 1px solid rgba(0,0,0,.08); }
 .order-pay-now { font-size: 22px; }
+.order-to { margin: 8px 0 14px; }
+.order-ens { font-size: 22px; margin-right: 6px; }
+.order-to .safe-addr { display: block; margin-top: 4px; }
 .order-qr { width: min(260px, 100%); background: #fff; border-radius: 8px; }
 .order-qr svg { display: block; width: 100%; height: auto; }
 .order-line .qty { display: flex; align-items: center; gap: 10px; flex: none; }

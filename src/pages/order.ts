@@ -175,12 +175,17 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       const q = qrcode(0, "M");
       q.addData(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${v.usdc}`);
       q.make();
-      h += `<p class="order-pay-now">Send <b>${usd(v.cents)} USDC</b> on ${esc(c.name)} in <b class="o-left"></b></p>
+      const named = (v.payTo || "").toLowerCase() === SHOP_ENS.address.toLowerCase();
+      h += `<p class="order-pay-now">Send <b>${usdc(v.usdc!)} USDC</b> on ${esc(c.name)} in <b class="o-left"></b></p>
+        <p class="fine">The exact amount: its last digits tell us it's you. <button class="btn btn-sm" data-copy="${usdc(v.usdc!)}">Copy amount</button></p>
+        <div class="order-to"><span class="fine">to</span> ${named ? `<b class="order-ens">${SHOP_ENS.name}</b>` : ""}
+          <code class="safe-addr">${esc(v.payTo || "")}</code>
+          <p><button class="btn btn-sm" data-copy="${esc(v.payTo || "")}">Copy address</button>
+          <a class="btn btn-sm" href="${c.scan}/address/${esc(v.payTo || "")}" target="_blank" rel="noopener">See it on ${esc(c.name)}</a></p></div>
         <div class="order-qr">${q.createSvgTag({ cellSize: 5, margin: 2, scalable: true })}</div>
-        <p class="fine">Scan with your phone's wallet. Exact amount: <b>${usdc(v.usdc!)}</b> USDC (the last digits tell us it's you).</p>
+        <p class="fine">Or scan with your phone's wallet: it fills everything in. We see the payment on our own.</p>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>
-        <p class="fine">Or send it to ${(v.payTo || "").toLowerCase() === SHOP_ENS.address.toLowerCase() ? `<b>${SHOP_ENS.name}</b> ` : ""}<code class="safe-addr">${esc(v.payTo || "")}</code>. We see it on its own.
-        Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>`;
+        <p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>`;
     }
     if (v.status === "expired") h += `<p><b>Time ran out.</b> Nothing was charged.</p><p><a class="btn btn-green" href="/order">Start over</a></p>`;
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
@@ -191,6 +196,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       <p><code class="safe-addr">${esc(link)}</code> <button class="btn btn-sm" id="o-copy">Copy</button></p></div>`;
     box.innerHTML = h;
     tick();
+    box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy!).then(() => say("Copied."))));
     box.querySelector<HTMLButtonElement>("#o-copy")!.onclick = () => navigator.clipboard.writeText(link).then(() => say("Copied."));
     const send = box.querySelector<HTMLButtonElement>("#o-send");
     if (send) send.onclick = () => payWallet().catch((e) => { busy = false; paint(); say(msgOf(e), true); });
