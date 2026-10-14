@@ -28,7 +28,7 @@ const ICON: Record<State, string> = { waiting: "", running: "…", pass: "✓", 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const RAW = "raw REPL; CTRL-B to exit\r\n>";
 const BOARD = 0, FW = 1, CHIP = 2, SHAKE = 3, BUTTONS = 4, COLORS = 5;
-const SHAKE_AT: [number, number][] = [[400000, 20], [1000000, 6]];   // [Hz, seconds]: the wedgie's own speed, then the margin
+const SHAKE_AT: [number, number][] = [[400000, 30], [1000000, 15]];   // [Hz, seconds]: the wedgie's own speed, then the margin
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 

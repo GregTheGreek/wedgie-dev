@@ -308,11 +308,12 @@ def _r(n):
 
 def shake(speeds):
     """Hammer the Trust M while its person shakes the wedgie: 200 bytes of its certificate, 32 random
-    bytes, and a fresh P-256 key pair (hard work: the most current the chip draws, so a weak power or
-    ground wire shows), over and over, each answer checked. Counts every try the wires missed (trustm.py
-    retries those quietly), every error and every wrong answer. speeds: [[Hz, seconds], ...]. Never signs
-    with a stored key (the chip slows itself down after many); the key pair is handed out, nothing kept."""
-    import trustm
+    bytes, a fresh P-256 key pair (hard work: the most current the chip draws, so a weak power or ground
+    wire shows), and SHA-256 of 200 random bytes (what we send checked too), over and over, each answer
+    checked. Counts every try the wires missed (trustm.py retries those quietly), every error and every
+    wrong answer. speeds: [[Hz, seconds], ...]. Nothing that wears the chip: no writes to its memory, no
+    stored key used (the key pair is handed out, nothing kept), a restart only after an error."""
+    import trustm, hashlib
     keep = trustm._write, trustm._read
     trustm._write, trustm._read = _w, _r
     total = sum(s for _, s in speeds)
@@ -330,9 +331,12 @@ def shake(speeds):
             _say("SHAKE IT", str(total - gone), _GREEN, _PAPER)
             while time.ticks_diff(time.ticks_ms(), t0) < secs * 1000:
                 try:
-                    k = ops % 3
+                    k = ops % 4
                     if k == 0:
                         ok = s.get(0xE0E0, 0, 200) == cert
+                    elif k == 3:
+                        m = os.urandom(200)
+                        ok = s.command(0x30, 0xE2, b"\x01\x00\xc8" + m)[3:] == hashlib.sha256(m).digest()
                     else:
                         r = s.random(32) if k == 1 else s.command(0x38, 0x03, b"\x07\x00\x00")   # GenKeyPair P-256
                         ok = (len(r) == 32 if k == 1 else len(r) > 80) and r != prev
