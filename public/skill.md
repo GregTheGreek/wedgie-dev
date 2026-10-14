@@ -380,8 +380,8 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
    the switch all the time. Never registers: the switch itself.
 6. **Still broken: https://wedgie.dev/test.** It copies the saves into the browser, wipes the whole
    Pico (BOOTSEL), puts MicroPython on (the W build if it has WiFi), then the firmware, puts the saves
-   back, and tests the board, the screen, every button and the chip. Nothing starts until its Format
-   button is pressed. It never touches the secure chip.
+   back, and tests the board, the screen, every button and the chip. Nothing starts until its Test it
+   button is pressed. It uses the secure chip but never changes it: safe to run again and again.
 
 **A dead or locked secure chip:** it's its own little board, so swap in a new breakout. Keys made inside
 the old chip are gone with it: anything they guarded (a wallet whose key lived on that chip) can only

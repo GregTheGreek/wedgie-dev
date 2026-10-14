@@ -64,6 +64,7 @@ export function format(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Test a wedgie</h1>
+    <p class="test-safe">Safe to run again and again. It never changes the secure chip, so keys on it stay. Saves come back after the wipe.</p>
     <div class="boot-hint card" id="t-hint" hidden>
       <div class="boot-hint-3d" id="t-hint-3d"></div>
       <div><h3>Hold BOOTSEL, plug it in</h3>

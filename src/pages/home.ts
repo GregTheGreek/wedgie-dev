@@ -16,7 +16,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.</p>
       <div class="row">
         <a class="btn btn-green" href="#build">Build your own</a>
-        <a class="btn" href="#get" id="buy-one">Buy one · $67</a>
+        <a class="btn" href="#get" id="buy-one">Buy one · $67<span class="surge">*</span></a>
       </div>
     </div>
     <div class="hero-art" id="hero-dev"></div>
