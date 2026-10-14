@@ -159,6 +159,8 @@ export function safe(main: HTMLElement) {
   let newChain = 8453, showWallet = false;   // the wallet's own Safes: folded away (the wedgie's are the point)
   const OFF = "wedgie.safe.wallet-off";      // Disconnect sticks: no reconnecting by itself on the next visit
   const deployed: Record<number, boolean | undefined> = {};
+  // this Safe on the other chains: there (true), not yet (false), unknown; recipe = how it was made, to make it again
+  let copies: Record<number, boolean | undefined> = {}, recipe: E.Recipe | null = null;
 
   // the old page's "last Safe" (it opened that one every time): moved into the list once the wedgie is read
   let oldSaved = "";
@@ -232,7 +234,7 @@ export function safe(main: HTMLElement) {
     const m = location.pathname.match(/^\/safe\/(\w+):(0x[0-9a-fA-F]{40})\/?$/);
     say("");
     if (m && KEYS[m[1]]) {
-      chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = [];
+      chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; copies = {}; recipe = null;
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = "";
       paintAll();
       checkDeployed();
@@ -326,9 +328,16 @@ export function safe(main: HTMLElement) {
     paintWedgie();
   }
 
+  /** createSigner for each of the wedgie's addresses in `owners` (one, or Instant Wallet's two). */
+  const signerCalls = (owners: string[]) => owners.map((o) => signers.findIndex((s) => eqA(s, o))).filter((k) => k >= 0)
+    .map((k) => ({ to: E.FACTORY, allowFailure: true, data: E.createSignerData(key!.x, key!.y, [E.VERIFIERS, ...E.IW_VERIFIERS][k]) }));
+
   async function deploy() {
-    if (await hasCode(chain, signer)) { deployed[chain] = true; return; }
-    await send(chain, E.FACTORY, E.createSignerData(key!.x, key!.y), say);
+    const need: string[] = [];
+    for (const a of ownedBy().length ? ownedBy() : [signer]) if (!(await hasCode(chain, a))) need.push(a);
+    if (!need.length) { deployed[chain] = true; return; }
+    const calls = signerCalls(need);
+    await send(chain, calls.length > 1 ? E.MULTICALL3 : E.FACTORY, calls.length > 1 ? E.aggregate3(calls) : calls[0].data, say);
     deployed[chain] = true;
     say(`Your wedgie is set up on ${CHAINS[chain].name}.`);
   }
@@ -527,8 +536,16 @@ export function safe(main: HTMLElement) {
           ? ` · <select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button>` : ""}</p>
         <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
         ${signer ? wedgieOwns() ? `<p class="good">Your wedgie is an owner.</p>` : `<p class="bad">Your wedgie isn't an owner of this Safe.</p>` : ""}`;
+      const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain);
+      const differs = recipe && recipe.owners.length && (recipe.threshold !== i.threshold || recipe.owners.length !== i.owners.length || recipe.owners.some((o) => !i.owners.some((x) => eqA(x, o))));
+      h += `<div class="safe-info"><p><b>Other chains</b> <span class="fine">same address</span></p><p>${others.map((t) => copies[t]
+        ? `<a class="btn btn-sm" data-nav href="${route(t, safeAddr)}">${esc(CHAINS[t].name)} ✓</a>`
+        : copies[t] === false ? `<button class="btn btn-sm" data-copy="${t}"${dis()}>Deploy on ${esc(CHAINS[t].name)}</button>`
+        : `<span class="fine">${esc(CHAINS[t].name)}…</span>`).join(" ")}</p>
+        ${differs ? `<p class="fine">A new copy starts with this Safe's first owners (${recipe!.threshold} of ${recipe!.owners.length}), not today's.</p>` : ""}</div>`;
     }
     box.innerHTML = h;
+    box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => b.onclick = () => job(() => copyTo(+b.dataset.copy!)));
     box.querySelectorAll<HTMLButtonElement>("[data-rm]").forEach((b) => b.onclick = () => removeOwner(b.dataset.rm!));
     $("o-th-go")?.addEventListener("click", () => changeThreshold(+($("o-th") as HTMLSelectElement).value));
   }
@@ -538,7 +555,14 @@ export function safe(main: HTMLElement) {
     if (!quiet) say("Opening the Safe.");
     const c = chain, a = safeAddr;
     try {
-      const i = await readSafe(c, a);
+      let i: Info;
+      for (let t = 0; ; t++) {       // just made: a public RPC can lag a few seconds behind, so watch before saying it isn't there
+        try { i = await readSafe(c, a); break; } catch (e: any) {
+          if (!e?.gone || t >= 8 || c !== chain || a !== safeAddr) throw e;
+          if (!quiet) say(`Watching for the Safe on ${CHAINS[c].name}.`, 10 + 10 * t);
+          await sleep(2000);
+        }
+      }
       let qq: any[] = [];
       try {
         qq = (await get(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${i.nonce}&ordering=nonce&limit=20`)).results || [];
@@ -547,8 +571,42 @@ export function safe(main: HTMLElement) {
       info = i; queue = qq;
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
+      checkCopies(c, a);
     } catch (e) { if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
     paintAll();
+  }
+
+  // ---- the same Safe on another chain: its creation call again, so the same address ----
+  async function checkCopies(c: number, a: string) {
+    await Promise.all(Object.keys(CHAINS).map(Number).filter((t) => t !== c).map(async (t) => {
+      try { const has = await hasCode(t, a); if (c === chain && a === safeAddr) copies[t] = has; } catch {}
+    }));
+    if (c === chain && a === safeAddr) paintSafe();
+    try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintSafe(); } } catch {}
+  }
+
+  /** How the Safe was made: its creation transaction (from Safe's API), the factory call found in it and checked. */
+  async function recipeOf(c: number, a: string): Promise<E.Recipe> {
+    let cr: any;
+    try { cr = await get(`${api(c)}/safes/${a}/creation/`); }
+    catch (e: any) { throw new Error(e.status === 404 ? "Safe's API hasn't seen this Safe yet. Try again in a minute." : msgOf(e)); }
+    const tx = await rpc(c, "eth_getTransactionByHash", [cr.transactionHash]) as any;
+    const ret = E.bytes(await view(c, cr.factoryAddress, E.selector("proxyCreationCode()")));
+    const at = Number(BigInt(E.hex(ret.slice(0, 32)))), n = Number(BigInt(E.hex(ret.slice(at, at + 32))));
+    const r = tx?.input && E.findRecipe(tx.input, a, cr.factoryAddress, E.hex(ret.slice(at + 32, at + 32 + n)));
+    if (!r) throw new Error("Couldn't find how this Safe was made, so it can't be copied to another chain.");
+    return r;
+  }
+
+  async function copyTo(t: number) {
+    const r = recipe || (recipe = await recipeOf(chain, safeAddr));
+    if (!(await hasCode(t, r.factory)) || !(await hasCode(t, r.singleton))) throw new Error(`Safe's contracts aren't on ${CHAINS[t].name}.`);
+    const calls = [...(key ? signerCalls(r.owners) : []), { to: r.factory, allowFailure: false, data: r.data }];
+    await send(t, calls.length > 1 ? E.MULTICALL3 : r.factory, calls.length > 1 ? E.aggregate3(calls) : r.data, say);
+    const a = safeAddr;
+    if (r.owners.some(mine)) remember(t, a);
+    go(route(t, a));
+    say(`Your Safe is on ${CHAINS[t].name} now, same address.`);
   }
 
   // ---- add the wedgie as an owner, from a browser wallet that already is one ----

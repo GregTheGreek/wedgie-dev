@@ -150,7 +150,13 @@ export const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
 /** SafeProxyFactory's ProxyCreation(proxy indexed, singleton): the new Safe's address is topics[1]. */
 export const PROXY_CREATION = hex(keccakText("ProxyCreation(address,address)"));
 
-export const createSignerData = (x: string, y: string) => call("createSigner(uint256,uint256,uint176)", [word(x), word(y), word(VERIFIERS)]);
+export const createSignerData = (x: string, y: string, verifiers = VERIFIERS) =>
+  call("createSigner(uint256,uint256,uint176)", [word(x), word(y), word(verifiers)]);
+/** Multicall3's aggregate3: several calls in one wallet transaction. */
+export function aggregate3(calls: { to: string; allowFailure: boolean; data: string }[]) {
+  const one = (c: (typeof calls)[0]) => ({ dyn: encode([aword(c.to), word(c.allowFailure ? 1 : 0), dynBytes(c.data)]) });
+  return call("aggregate3((address,bool,bytes)[])", [{ dyn: cat(word(calls.length), encode(calls.map(one))) }]);
+}
 
 /** One wallet transaction: the wedgie's signer contract (if it isn't there yet), then the Safe. */
 export function newSafeData(x: string, y: string, owners: string[], threshold: number, salt: bigint) {
@@ -158,9 +164,45 @@ export function newSafeData(x: string, y: string, owners: string[], threshold: n
   const setup = call("setup(address[],uint256,address,bytes,address,address,uint256,address)",
     [dynAddrs(owners), word(threshold), Z, dynBytes("0x"), aword(FALLBACK_HANDLER), Z, Z, Z]);
   const create = call("createProxyWithNonce(address,bytes,uint256)", [aword(SAFE_L2), dynBytes(setup), word(salt)]);
-  const one = (to: string, allowFailure: boolean, data: string) => ({ dyn: encode([aword(to), word(allowFailure ? 1 : 0), dynBytes(data)]) });
-  const calls = [one(FACTORY, true, createSignerData(x, y)), one(SAFE_FACTORY, false, create)];
-  return call("aggregate3((address,bool,bytes)[])", [{ dyn: cat(word(calls.length), encode(calls)) }]);
+  return aggregate3([{ to: FACTORY, allowFailure: true, data: createSignerData(x, y) }, { to: SAFE_FACTORY, allowFailure: false, data: create }]);
+}
+
+// ---- the same Safe on another chain: its factory call again, same address ----
+/** How a Safe was made: createProxyWithNonce(singleton, initializer, salt) on its factory. Same call = same address on any chain. */
+export type Recipe = { factory: string; singleton: string; initializer: string; salt: bigint; owners: string[]; threshold: number; data: string };
+const CREATE_PROXY = selector("createProxyWithNonce(address,bytes,uint256)").slice(2);
+const SETUP = selector("setup(address[],uint256,address,bytes,address,address,uint256,address)").slice(2);
+const num = (b: Uint8Array, at: number) => Number(BigInt(hex(b.slice(at, at + 32))));
+
+/** CREATE2 address of a Safe proxy: the factory's proxyCreationCode + singleton, salted by the initializer and salt. */
+export function proxyAddress(factory: string, creationCode: string, singleton: string, initializer: string, salt: bigint) {
+  const s = keccak256(cat(keccak256(bytes(initializer)), word(salt)));
+  const code = keccak256(cat(bytes(creationCode), aword(singleton)));
+  return checksum(hex(keccak256(cat(bytes("0xff"), bytes(factory), s, code)).slice(12)));
+}
+
+/** Find the createProxyWithNonce call that made `safe` anywhere in a transaction's input (a multicall, a 4337 initCode). */
+export function findRecipe(input: string, safe: string, factory: string, creationCode: string): Recipe | null {
+  const h = input.toLowerCase().replace(/^0x/, "");
+  for (let i = h.indexOf(CREATE_PROXY); i >= 0; i = h.indexOf(CREATE_PROXY, i + 1)) {
+    if (i % 2) continue;
+    try {
+      const b = bytes("0x" + h.slice(i + 8));
+      const singleton = checksum(hex(b.slice(12, 32))), off = num(b, 32), salt = BigInt(hex(b.slice(64, 96)));
+      const n = num(b, off);
+      if (off + 32 + n > b.length) continue;
+      const initializer = hex(b.slice(off + 32, off + 32 + n));
+      if (proxyAddress(factory, creationCode, singleton, initializer, salt).toLowerCase() !== safe.toLowerCase()) continue;
+      let owners: string[] = [], threshold = 0;
+      if (initializer.slice(2, 10) === SETUP) {
+        const a = bytes("0x" + initializer.slice(10)), o = num(a, 0);
+        owners = Array.from({ length: num(a, o) }, (_, k) => checksum(hex(a.slice(o + 44 + 32 * k, o + 64 + 32 * k))));
+        threshold = num(a, 32);
+      }
+      return { factory, singleton, initializer, salt, owners, threshold, data: "0x" + CREATE_PROXY + hex(encode([aword(singleton), dynBytes(initializer), word(salt)])).slice(2) };
+    } catch { /* not a real call here: keep looking */ }
+  }
+  return null;
 }
 
 /** Safe's MultiSendCallOnly 1.4.1: a Safe tx with operation 1 (DELEGATECALL) to it runs a batch of plain calls. */
