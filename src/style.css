@@ -663,3 +663,4 @@ body.dock-running #s-msg { display: none; }
 p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--mint-d); }
 .why { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--recess); box-shadow: var(--recess-shadow); max-width: 520px; text-align: left; }
 .why p { margin: 6px 0; }
+.safe-ui { float: right; }

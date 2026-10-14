@@ -525,13 +525,14 @@ export function safe(main: HTMLElement) {
     box.hidden = !safeAddr;
     if (box.hidden) return;
     const c = CHAINS[chain];
-    let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a></p>
+    let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a>
+      <a class="btn btn-sm safe-ui" href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Open in Safe{Wallet} ↗</a></p>
       <h2>${info && isIW(info.owners) ? `${iwMark}Instant Wallet ` : ""}Safe on ${esc(c.name)}</h2>
       <p>${address(safeAddr, { link: c.scan, size: "lg", long: true, chain })}</p>`;
     if (info) {
       const i = info, canChange = wedgieOwns() || isOwner(account);
       h += `<p>${esc(E.fmt(i.balance, 18))} ETH${i.usdc !== null ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""} ·
-          <a href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Safe{Wallet}</a> · <a href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">explorer</a></p>
+          <a href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">explorer</a></p>
         <p>${i.threshold} of ${plural(i.owners.length, "owner")} must sign${canChange && i.owners.length > 1
           ? ` · <select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button>` : ""}</p>
         <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
@@ -695,7 +696,9 @@ export function safe(main: HTMLElement) {
     }).join("");
     const ready = /data-exec/.test(items);
     box.innerHTML = `<h2>${ready ? "Ready: press Execute" : "Waiting to sign"}</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
-      <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
+      <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button>
+        <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Queue in Safe{Wallet} ↗</a>
+        <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/history")}" target="_blank" rel="noopener">History ↗</a></p>`;
     $("s-refresh").onclick = () => job(() => load());
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
