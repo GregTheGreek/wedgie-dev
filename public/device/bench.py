@@ -307,10 +307,11 @@ def _r(n):
 
 
 def shake(speeds):
-    """Hammer the Trust M while its person shakes the wedgie: 200 bytes of its certificate and 32 random
-    bytes, over and over, each answer checked. Counts every try the wires missed (trustm.py retries those
-    quietly), every error and every wrong answer. speeds: [[Hz, seconds], ...]. Never signs (the chip
-    slows itself down after many key uses)."""
+    """Hammer the Trust M while its person shakes the wedgie: 200 bytes of its certificate, 32 random
+    bytes, and a fresh P-256 key pair (hard work: the most current the chip draws, so a weak power or
+    ground wire shows), over and over, each answer checked. Counts every try the wires missed (trustm.py
+    retries those quietly), every error and every wrong answer. speeds: [[Hz, seconds], ...]. Never signs
+    with a stored key (the chip slows itself down after many); the key pair is handed out, nothing kept."""
     import trustm
     keep = trustm._write, trustm._read
     trustm._write, trustm._read = _w, _r
@@ -329,12 +330,13 @@ def shake(speeds):
             _say("SHAKE IT", str(total - gone), _GREEN, _PAPER)
             while time.ticks_diff(time.ticks_ms(), t0) < secs * 1000:
                 try:
-                    if ops % 4:
-                        r = s.random(32)
-                        ok = len(r) == 32 and r != prev
-                        prev = r
-                    else:
+                    k = ops % 3
+                    if k == 0:
                         ok = s.get(0xE0E0, 0, 200) == cert
+                    else:
+                        r = s.random(32) if k == 1 else s.command(0x38, 0x03, b"\x07\x00\x00")   # GenKeyPair P-256
+                        ok = (len(r) == 32 if k == 1 else len(r) > 80) and r != prev
+                        prev = r
                     ops += 1
                     bad += not ok
                 except Exception as e:
