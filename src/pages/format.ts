@@ -13,7 +13,8 @@
 //  5. shaken: its person shakes the wedgie while it's pounded in phases: the Pico (both cores write and
 //     check RAM), the Trust M alone, then both; the chip at 400 kHz, then at 1 MHz (the margin, reported
 //     only). Every answer checked, every missed try counted, temperature and VSYS watched (bench.py shake);
-//  6. on its screen: each button alone, in order; then each again, filling the screen with its color.
+//  6. on its screen: each button alone, in order; the joystick's 4 diagonals (two directions, never IN);
+//     then each button again, filling the screen with its color.
 // It ends with the latest firmware and no app (one gets picked at /connect).
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
@@ -205,7 +206,9 @@ export function format(main: HTMLElement) {
     let step = BOARD, gone = false;
     const phaseAt: Record<number, number> = { 1: -1, 2: -1 };
     const combos: string[] = [];
-    const buttonsLine = () => (combos.length ? `All 9 alone · ${combos.join(", ")}` : "All 9, each alone");
+    const label = (k: string) => NAME[k] ?? k;   // a diagonal comes named already ("UP+LEFT")
+    let at = "";                                  // the last thing its screen asked for
+    const buttonsLine = () => (combos.length ? `All 9 alone, 4 diagonals · ${combos.join(", ")}` : "All 9 alone, 4 diagonals");
     try {
       await W.withRepl(w, async (r) => {
         try {
@@ -292,10 +295,14 @@ export function format(main: HTMLElement) {
           r.onLine = (t, v) => {
             if (t === "prompt") {
               if (v.phase === 2 && tests[BUTTONS].state === "running") { set(BUTTONS, "pass", buttonsLine()); step = COLORS; }
-              phaseAt[v.phase] = ORDER.indexOf(v.key);
-              set(v.phase === 1 ? BUTTONS : COLORS, "running", `Press ${NAME[v.key]} (${phaseAt[v.phase] + 1}/9)`);
+              at = label(v.key);
+              if (v.phase === 3) set(BUTTONS, "running", `Press ${at} together, not IN (${v.n}/4)`);
+              else {
+                phaseAt[v.phase] = ORDER.indexOf(v.key);
+                set(v.phase === 1 ? BUTTONS : COLORS, "running", `Press ${at} (${phaseAt[v.phase] + 1}/9)`);
+              }
             }
-            if (t === "combo") combos.push(`${NAME[v.key]} came with ${v.with.map((k: string) => NAME[k]).join("+")}`);
+            if (t === "combo") combos.push(`${label(v.key)} came with ${v.with.map(label).join("+")}`);
             if (t === "stuck") combos.push(`${v.map((k: string) => NAME[k]).join("+")} held down`);
             if (t === "combo" || t === "stuck") {
               const i = step === COLORS ? COLORS : BUTTONS;
@@ -315,8 +322,7 @@ export function format(main: HTMLElement) {
     } catch (e: any) {
       const m = e?.message || String(e);
       if (step <= COLORS && tests[step].state !== "pass") {
-        const at = step === BUTTONS ? phaseAt[1] : step === COLORS ? phaseAt[2] : -1;
-        set(step, "fail", /unplugged/.test(m) && at >= 0 ? `Unplugged at ${NAME[ORDER[at]]}` : m);
+        set(step, "fail", /unplugged/.test(m) && at && (step === BUTTONS || step === COLORS) ? `Unplugged at ${at}` : m);
       }
     }
     busy = false;

@@ -146,7 +146,7 @@ def _down(pins):
     return {k for k, p in pins.items() if not p.value()}
 
 
-def _released(pins, target, phase):
+def _released(pins, again):
     """Until nothing is down for 30 ms. Held 2 s: say which, and wait for it."""
     t, calm, warned = time.ticks_ms(), None, False
     while True:
@@ -163,27 +163,33 @@ def _released(pins, target, phase):
             break
         time.sleep_ms(3)
     if warned:
-        _prompt(target, phase)
+        again()
+
+
+def _touched(pins):
+    """Everything touched from the first touch until all are released again (40 ms calm)."""
+    del _edges[:]
+    seen, calm = set(), None
+    while True:
+        now = _down(pins)
+        while _edges:
+            seen.add(_edges.pop())
+        seen |= now
+        if seen and not now:
+            if calm is None:
+                calm = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), calm) >= 40:
+                return seen
+        else:
+            calm = None
+        time.sleep_ms(2)
 
 
 def _press(target, pins, phase):
-    _released(pins, target, phase)
+    again = lambda: _prompt(target, phase)
+    _released(pins, again)
     while True:
-        del _edges[:]
-        seen, calm = set(), None
-        while True:
-            now = _down(pins)
-            while _edges:
-                seen.add(_edges.pop())
-            seen |= now
-            if seen and not now:
-                if calm is None:
-                    calm = time.ticks_ms()
-                elif time.ticks_diff(time.ticks_ms(), calm) >= 40:
-                    break
-            else:
-                calm = None
-            time.sleep_ms(2)
+        seen = _touched(pins)
         if seen == {target}:
             out("ok", {"phase": phase, "key": target})
             return
@@ -195,8 +201,35 @@ def _press(target, pins, phase):
             out("wrong", {"phase": phase, "want": target, "got": others[0]})
             _say("THAT WAS " + _NAME[others[0]], "PRESS " + _NAME[target], _RED, _PAPER)
         time.sleep_ms(900)
-        _prompt(target, phase)
-        _released(pins, target, phase)
+        again()
+        _released(pins, again)
+
+
+# The joystick's diagonals: two directions at once, never IN (the stick pressed down on its way over).
+_DIAG = (("up", "left"), ("up", "right"), ("down", "left"), ("down", "right"))
+
+
+def _diag(pair, pins, n):
+    want, name = set(pair), "+".join(_NAME[k] for k in pair)
+
+    def again():
+        _say(name, "BOTH %d/4" % n)
+        out("prompt", {"phase": 3, "key": name, "n": n})
+    again()
+    _released(pins, again)
+    while True:
+        seen = _touched(pins)
+        if seen == want:
+            out("ok", {"phase": 3, "key": name})
+            return
+        if want <= seen:
+            out("combo", {"phase": 3, "key": name, "with": sorted(seen - want)})
+            _say("NOT CLEAN", " ".join(_NAME[k] for k in sorted(seen - want)), _RED, _PAPER)
+        else:
+            _say("BOTH AT ONCE", name, _RED, _PAPER)
+        time.sleep_ms(900)
+        again()
+        _released(pins, again)
 
 
 _bg = (200, 200, 200)   # in the color pass: the last button's color, which stays up behind the next prompt
@@ -212,8 +245,8 @@ def _prompt(key, phase):
 
 
 def bench(chip_ok, chip_line):
-    """Chip result, then every button alone in order, then every button again filling the screen with
-    its own color, then the verdict. Runs until done; unplugging ends it."""
+    """Chip result, then every button alone in order, the joystick's four diagonals, then every button
+    again filling the screen with its own color, then the verdict. Runs until done; unplugging ends it."""
     pins = {k: Pin(p, Pin.IN, Pin.PULL_UP) for k, p in KEYS.items()}
     _arm(pins)
     time.sleep_ms(5)
@@ -222,6 +255,8 @@ def bench(chip_ok, chip_line):
     for k in _ORDER:
         _prompt(k, 1)
         _press(k, pins, 1)
+    for i, pair in enumerate(_DIAG):
+        _diag(pair, pins, i + 1)
     global _bg
     _bg = (200, 200, 200)
     for k in _ORDER:

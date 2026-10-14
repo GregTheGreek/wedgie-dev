@@ -112,6 +112,11 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         const ev = (s) => { t += 40; setTimeout(() => live && push(s + "\r\n"), t); };
         push("OK");
         for (const phase of [1, 2]) for (const k of ORDER) {
+          if (phase === 2 && k === ORDER[0]) ["UP+LEFT", "UP+RIGHT", "DOWN+LEFT", "DOWN+RIGHT"].forEach((d, i) => {
+            ev(`@prompt {"phase":3,"key":"${d}","n":${i + 1}}`);
+            if (sc.combo && i === 0) ev(`@combo {"phase":3,"key":"${d}","with":["press"]}`);
+            ev(`@ok {"phase":3,"key":"${d}"}`);
+          });
           ev(`@prompt {"phase":${phase},"key":"${k}"}`);
           if (sc.unplugAt === k && phase === 1) { t += 100; setTimeout(unplug, t); return; }
           if (sc.combo && phase === 1 && k === "up") ev(`@combo {"phase":1,"key":"up","with":["press"]}`);
