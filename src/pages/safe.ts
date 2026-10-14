@@ -263,6 +263,8 @@ export function safe(main: HTMLElement) {
   });
 
   // ---- the wedgie ----
+  // No wedgie here: the way back to get one (same as /connect without one).
+  const HOME = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;
   function paintWedgie() {
     const ws = Drive.inApp() ? (driveState === "here" ? [DRIVE] : []) : W.wedgies().filter((w) => w.state === "ready");
     const app = ws.filter((w) => w.running === "safe");
@@ -271,9 +273,9 @@ export function safe(main: HTMLElement) {
       ? `<p>Plug in your wedgie, then <button class="btn btn-sm btn-green" id="s-drive">Find it</button></p>`
       : driveState === "readonly" ? `<p><button class="btn btn-sm btn-green" id="s-drive">Allow phone txns</button> then press green on your wedgie.</p>`
       : `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
-    else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
-    else if (!Drive.inApp() && !W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
-    else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
+    else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>${HOME}`;
+    else if (!Drive.inApp() && !W.armed()) h += `<p class="row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
+    else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>${HOME}`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
     else if (!key) h += noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
     else {
