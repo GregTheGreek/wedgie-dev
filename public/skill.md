@@ -261,8 +261,7 @@ delete reached it and 2 s had passed. So:
 ## The hardware: parts, pinout, putting it together
 
 Be exact when someone builds or rebuilds one: **a wire in the wrong hole is the most common failure.**
-A 3D step-by-step is on https://wedgie.dev ("Put it together"); parts and where to buy them on
-https://wedgie.dev/build.
+A 3D step-by-step is on https://wedgie.dev ("Put it together"); parts are below.
 
 ### Parts
 - **A Pico**: Raspberry Pi Pico 2 W (RP2350, WiFi), Pico W (RP2040, WiFi), or a USB-C RP2040 Pico clone

@@ -116,7 +116,6 @@ export function home(main: HTMLElement): Promise<unknown> {
   <section id="agents" class="sec agents">
     <a class="btn btn-lg" href="/skill.md" target="_blank"><span class="bot" aria-hidden="true">🤖</span> skill.md</a>
     <a class="btn btn-lg" href="/code">Create software</a>
-    <a class="btn btn-lg" href="/build">Customize</a>
     <a class="btn btn-lg" href="/safe">Safe</a>
   </section>
 `;

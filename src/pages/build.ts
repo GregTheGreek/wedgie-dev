@@ -225,12 +225,14 @@ export const fromPrice = () => price({ app: DEF_APP, pico: [...PICOS].sort((x, y
 const link = (href: string, t: string) => `<a class="btn btn-xs" href="${href}" target="_blank" rel="noopener">${t}</a>`;
 
 export async function build(main: HTMLElement) {
+  // Hidden for now (Austin, 10-13): no links in, not indexed, no buying.
+  document.head.insertAdjacentHTML("beforeend", `<meta name="robots" content="noindex">`);
   main.innerHTML = `
   <section class="sec bld">
     <div class="sec-head">
       <span class="kicker">Build a wedgie</span>
       <h2>Make it yours.</h2>
-      <p>Pick its app, the chips inside, and the color of every part. The link is this exact wedgie: share it, and anyone can buy one or build one.</p>
+      <p>Pick its app, the chips inside, and the color of every part. The link is this exact wedgie: share it, and anyone can build one.</p>
       <div class="row bld-presets"><span class="fine">Start from</span>${PRESETS.map((p) => `<a class="btn btn-xs" href="/build?${p.q}" data-q="${p.q}">${p.name}</a>`).join("")}</div>
     </div>
     <div class="bld-grid">
@@ -255,17 +257,6 @@ export async function build(main: HTMLElement) {
     </div>
 
     <div class="bld-out">
-      <div class="card bld-buy">
-        <span class="kicker">Buy this one</span>
-        <div class="order-price"><span id="bld-price"></span> <span>shipped</span></div>
-        <p>Built, printed in these colors, with <b id="bld-buy-app"></b> on it.</p>
-        <table class="bld-cost" id="bld-cost"></table>
-        <div class="row">
-          <button class="btn btn-green" disabled>Pay with USDC</button>
-          <button class="btn" disabled>Pay with card</button>
-        </div>
-        <p class="fine soon">Checkout opens soon.</p>
-      </div>
       <div class="card bld-diy">
         <span class="kicker">Build this one</span>
         <ol class="bld-steps" id="bld-steps"></ol>
@@ -323,15 +314,10 @@ export async function build(main: HTMLElement) {
     // The link
     const url = `${location.origin}/build?${query(b)}`;
     $("#bld-url").textContent = url;
-    $("#bld-buy-app").textContent = cart?.name || b.app;
     // Board
     $("#bld-picos").innerHTML = PICOS.map((p) => `<button class="bld-app${p.key === b.pico ? " on" : ""}" data-pico="${p.key}" aria-pressed="${p.key === b.pico}">
       <span><b>${esc(p.name)}</b> <span class="fine">$${p.price.toFixed(2)} · ${p.tested ? "fit-tested" : "should fit, not tested yet"}</span><span class="fine">${esc(p.about)}</span></span></button>`).join("");
     $("#bld-picos").querySelectorAll<HTMLButtonElement>("[data-pico]").forEach((x) => (x.onclick = () => set({ ...b, pico: x.dataset.pico! })));
-    // Price
-    const pr = price(b);
-    $("#bld-price").textContent = `$${pr.total}`;
-    $("#bld-cost").innerHTML = pr.lines.map(([t, x]) => `<tr><td>${esc(t)}</td><td>$${x.toFixed(2)}</td></tr>`).join("");
     const pico = picoOf(b.pico)!;
     // Build it yourself: the parts this one needs, the prints in its colors, then assemble and install.
     const cname = (k: string) => COLORS[b.colors[k]].name;

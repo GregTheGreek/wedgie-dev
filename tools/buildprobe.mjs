@@ -28,11 +28,9 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
   check(await page.locator('#bld-chip [data-slot="0"]').isDisabled() && q().chip2 === "none", `${vp.name}: the wallet locks the ATECC608 into the first slot; the second is free`);
   check((await page.locator("#bld-steps").innerText()).includes("ATECC608"), `${vp.name}: build list has the chip`);
-  const cost = async () => +(await page.locator("#bld-price").innerText()).replace("$", "");
-  const withChip = await cost();
-  check(q().pico === "nulllab" && withChip === 57, `${vp.name}: default board in the URL; wallet price is parts + $30 = $${withChip}`);
+  check(q().pico === "nulllab" && await page.locator(".bld-buy, #bld-price").count() === 0, `${vp.name}: default board in the URL; no buy card (hidden page)`);
   await tap('[data-pico="green"]');
-  check(q().pico === "green" && await cost() < withChip && (await page.locator("#bld-steps").innerText()).includes("Green USB-C Pico"), `${vp.name}: another board: in the URL, cheaper, on the build list`);
+  check(q().pico === "green" && (await page.locator("#bld-steps").innerText()).includes("Green USB-C Pico"), `${vp.name}: another board: in the URL, cheaper, on the build list`);
 
   await tap('[data-app="demo"]');
   const slot = (i) => page.locator(`#bld-chip [data-slot="${i}"]`);
@@ -79,12 +77,12 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   await ctx.close();
 }
 
-// The front page links here.
+// The front page doesn't link here (hidden for now).
 {
   const page = await browser.newPage();
   await page.goto(base + "/");
   await page.waitForSelector("#agents", { state: "attached" });
-  check(await page.locator('#agents a[href="/build"]').count() === 1, "front page: Customize → /build");
+  check(await page.locator('a[href="/build"]').count() === 0, "front page: no link to /build");
 }
 await browser.close();
 process.exit(fail ? 1 : 0);
