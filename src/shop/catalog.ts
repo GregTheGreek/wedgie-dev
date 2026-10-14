@@ -10,21 +10,28 @@ export type Cart = Record<Item, number>;
 export const MAX_EACH = 10;
 export const SHIPS = "Ships within a week, US only.";
 
-// Busy days cost more: every TIER boxes sold in a day (8 AM to 8 AM Mountain, wedgies and kits together) adds STEP to
-// each one after, with no top. 5 sold, buy 3: 1 at $67, 2 at $82. `sold` comes from api/ (paid orders).
-export const TIER = 6, STEP = 1500;
-export const bump = (n: number) => STEP * Math.floor(n / TIER);
+// The price follows demand: each box sold adds BUMP to the next one (wedgies and kits together). That extra
+// melts away evenly, all of it 24 hours after the last sale, so a quiet day is back at $67. Whole cents,
+// rounded down. Only paid boxes count: a quote that's never paid moves nothing. `extra` comes from api/.
+export const BUMP = 500, MELT = 24 * 3600_000;
+export type Sale = { at: number; n: number };   // ms, boxes
+export function extraAt(sales: Sale[], now: number) {
+  let e = 0, t = 0;
+  const melt = (dt: number) => Math.floor(e * Math.max(0, 1 - dt / MELT));
+  for (const s of [...sales].sort((a, b) => a.at - b.at)) { e = melt(s.at - t) + BUMP * s.n; t = s.at; }
+  return melt(now - t);
+}
 export type Line = { item: Item; qty: number; cents: number };
-export function cartLines(c: Cart, sold: number): Line[] {
+export function cartLines(c: Cart, extra: number): Line[] {
   const lines: Line[] = [];
-  let n = sold;
-  for (const k of Object.keys(ITEMS) as Item[]) for (let i = 0; i < c[k]; i++, n++) {
-    const cents = ITEMS[k].cents + bump(n), last = lines[lines.length - 1];
+  let x = extra;
+  for (const k of Object.keys(ITEMS) as Item[]) for (let i = 0; i < c[k]; i++, x += BUMP) {
+    const cents = ITEMS[k].cents + x, last = lines[lines.length - 1];
     if (last?.item === k && last.cents === cents) last.qty++; else lines.push({ item: k, qty: 1, cents });
   }
   return lines;
 }
-export const cartCents = (c: Cart, sold: number) => cartLines(c, sold).reduce((t, l) => t + l.qty * l.cents, 0);
+export const cartCents = (c: Cart, extra: number) => cartLines(c, extra).reduce((t, l) => t + l.qty * l.cents, 0);
 export function cartOk(c: unknown): c is Cart {
   const o = c as Record<string, unknown>;
   if (!o || typeof o !== "object") return false;
@@ -32,10 +39,12 @@ export function cartOk(c: unknown): c is Cart {
   return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0);
 }
 
-// USDC: the same contract kind (6 decimals) on each chain the shop takes.
-export const PAY_CHAINS: Record<number, { name: string; usdc: string; rpc: string; scan: string; confirm: number }> = {
-  8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", rpc: "https://mainnet.base.org", scan: "https://basescan.org", confirm: 3 },
-  1: { name: "Ethereum", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", confirm: 2 },
+// USDC: the same contract kind (6 decimals) on each chain the shop takes. Base only: the shop's Safe isn't on
+// Ethereum yet (add it back here once it is). The server reads the chain through SHOP_RPC_<chainId>.
+// A USDC quote holds for QUOTE; a card one for Stripe's shortest checkout, 30 minutes.
+export const QUOTE = 10 * 60_000, CARD_QUOTE = 30 * 60_000;
+export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: string; confirm: number; secs: number }> = {
+  8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 3, secs: 2 },
 };
 
 // What the buyer types, sealed in their browser (seal.ts) before it leaves it.

@@ -2,7 +2,7 @@
 //   GET                          every paid, unshipped order with its sealed address (only omen can open it)
 //   POST {id, tracking}          shipped: the sealed address, payer, transaction and Stripe session are wiped
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way
-// Each GET also deletes what's done with: shipped or canceled orders and unpaid ones, 30 days on.
+// Each GET also deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
 import { db, env, json, oops, same } from "./_shop.js";
 
 const allowed = (req: Request) => {
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   if (!allowed(req)) return oops("no", 401);
   const sql = await db();
   await sql`delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
-    or (status = 'new' and created < now() - interval '30 days')`;
+    or (status in ('new', 'expired') and created < now() - interval '30 days')`;
   const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created from orders where status = 'paid' order by paid_at`;
   return json({ orders });
 }

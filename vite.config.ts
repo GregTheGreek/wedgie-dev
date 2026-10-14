@@ -105,6 +105,8 @@ const ISOLATE = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Emb
 
 export default defineConfig({
   plugins: [firmware(), loaderManifest(), shopApi()],
+  // shopprobe with no database account: an in-memory Postgres in Neon's place (tools/neonlite.mjs).
+  ...(process.env.SHOP_DATABASE_URL_DEV === "pglite" ? { resolve: { alias: { "@neondatabase/serverless": new URL("./tools/neonlite.mjs", import.meta.url).pathname } } } : {}),
   // emu.html (the virtual wedgie's test page) is served by `vite` in dev; it is built only for
   // tools/emuprobe.mjs (WEDGIE_EMU_TEST=1), so the production site's chunks stay as they were.
   build: { target: "es2022", assetsInlineLimit: 0, ...(process.env.WEDGIE_EMU_TEST ? { rollupOptions: { input: { main: "index.html", emu: "emu.html" } } } : {}) },

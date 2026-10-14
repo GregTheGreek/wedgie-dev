@@ -1,6 +1,6 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
-import { ITEMS, TIER, bump, type Item } from "../shop/catalog";
+import { ITEMS, type Item } from "../shop/catalog";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
@@ -122,10 +122,11 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   // $67: the 6-7 hands, for a moment, each time the price comes into view.
   const price = main.querySelector<HTMLElement>(".order-price")!;
-  let item: Item = "wedgie", sold = 0;
+  let item: Item = "wedgie", extra = 0;
+  const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
   let hands: { play(): void } | null = null;
   new IntersectionObserver(async (es) => {
-    if (!es.some((e) => e.isIntersecting) || sold >= TIER) return;
+    if (!es.some((e) => e.isIntersecting) || extra > 0) return;
     await pageShown;
     if (!hands) { const { mountSixSeven } = await import("../ui/sixseven"); hands = mountSixSeven(price.querySelector(".sixseven-box")!); }
     hands.play();
@@ -135,14 +136,14 @@ export function home(main: HTMLElement): Promise<unknown> {
   const lane = main.querySelector<HTMLElement>(".truck-lane")!;
   new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { lane.classList.add("go"); o.disconnect(); } }, { threshold: 0.35 }).observe(lane);
 
-  // Today's price: it climbs on busy days (shop/catalog.ts).
+  // The price right now: each sale adds a bit, gone in a day without one (shop/catalog.ts).
   const showPrice = () => {
-    price.querySelector<HTMLElement>(".sixseven-box")!.hidden = sold >= TIER;   // no 6-7 once it isn't $67
-    const c = ITEMS[item].cents + bump(sold);
-    price.firstChild!.nextSibling!.textContent = `$${c / 100} `;
-    main.querySelector("#buy-one")!.textContent = `Buy one · $${(ITEMS.wedgie.cents + bump(sold)) / 100}`;
+    price.querySelector<HTMLElement>(".sixseven-box")!.hidden = extra > 0;   // no 6-7 once it isn't $67
+    const c = ITEMS[item].cents + extra;
+    price.firstChild!.nextSibling!.textContent = `${usd(c)} `;
+    main.querySelector("#buy-one")!.textContent = `Buy one · ${usd(ITEMS.wedgie.cents + extra)}`;
   };
-  fetch("/api/order").then((r) => r.json()).then((r) => { sold = r.sold || 0; showPrice(); }, () => {});
+  fetch("/api/order").then((r) => r.json()).then((r) => { extra = r.extra || 0; showPrice(); }, () => {});
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });

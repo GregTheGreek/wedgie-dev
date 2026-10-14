@@ -4,9 +4,9 @@
 // ships, the sealed address, the payer and the payment links are wiped; the rest goes 30 days later.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
-// SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (optional, else a public RPC).
+// SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, PAY_CHAINS, cartLines, type Cart, type Line } from "../src/shop/catalog.js";
+import { ITEMS, PAY_CHAINS, QUOTE, CARD_QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -26,7 +26,7 @@ export async function db() {
       cart jsonb not null,
       cents int not null,
       pay text not null,              -- card | usdc
-      status text not null default 'new',   -- new | paid | shipped | canceled
+      status text not null default 'new',   -- new | paid | shipped | canceled | expired (never paid in time)
       sealed text,                    -- the address, sealed to omen's key; null once shipped
       chain int, usdc bigint,         -- usdc: the exact amount asked for (its last digits name this order)
       stripe_session text,
@@ -36,6 +36,7 @@ export async function db() {
     await sql`create unique index if not exists orders_open_usdc on orders (chain, usdc) where status = 'new' and usdc is not null`;
     await sql`create unique index if not exists orders_tx on orders (chain, tx) where tx is not null`;
     await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
+    await sql`alter table orders add column if not exists from_block bigint`;   // usdc: the chain's head when it was made
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -59,7 +60,7 @@ export function same(a: string, b: string) {   // constant time
 
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
-  chain: number | null; usdc: string | null; stripe_session: string | null; tx: string | null; payer: string | null;
+  chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null;
   tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null;
 };
 
@@ -67,14 +68,25 @@ export type Order = {
 export const publicView = (o: Order) => ({
   id: o.id, cart: o.cart, lines: o.lines, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
   payTo: o.pay === "usdc" && o.status === "new" ? env("SHOP_PAY_TO") : undefined,
+  left: o.status === "new" ? Math.max(0, Date.parse(o.created) + (o.pay === "usdc" ? QUOTE : CARD_QUOTE) - Date.now()) : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
 
-/** Boxes in orders paid since 8 AM Mountain (the shop's day): what today's price is set by (catalog.ts cartLines). */
-export async function soldToday(sql: Awaited<ReturnType<typeof db>>) {
-  const [r] = await sql`select coalesce(sum((cart->>'wedgie')::int + (cart->>'kit')::int), 0)::int as n from orders
-    where status in ('paid', 'shipped') and (paid_at at time zone 'America/Denver' - interval '8 hours')::date = (now() at time zone 'America/Denver' - interval '8 hours')::date`;
-  return r.n as number;
+/** What every box costs over its list price right now (catalog.ts extraAt): from the paid orders. */
+export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
+  const rows = await sql`select paid_at, cart from orders where status in ('paid', 'shipped') and paid_at > now() - interval '60 days'`;
+  return extraAt(rows.map((r: any) => ({ at: Date.parse(r.paid_at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
+}
+
+/** Unpaid orders whose quote ran out are 'expired' (the address stays till admin.ts deletes it: a USDC
+ * transfer sent in time but seen late still pays it, usdcPaid checks the time). A USDC one gets 2 more
+ * minutes first; expiring frees its amount's last digits for a new order. */
+export const late = (o: Pick<Order, "pay" | "created">) =>
+  Date.now() > Date.parse(o.created) + (o.pay === "usdc" ? QUOTE + 120_000 : CARD_QUOTE);
+export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
+  await sql`update orders set status = 'expired' where status = 'new' and (
+    (pay = 'usdc' and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval)
+    or (pay = 'card' and created < now() - ${`${CARD_QUOTE / 1000 + 60} seconds`}::interval))`;
 }
 
 // ---- Stripe (its REST API; payment only: it is never sent an address) ----
@@ -94,6 +106,7 @@ export async function checkout(o: Pick<Order, "id" | "cart" | "lines">, origin: 
     mode: "payment",
     client_reference_id: o.id,
     "metadata[order]": o.id,
+    expires_at: String(Math.floor(Date.now() / 1000) + CARD_QUOTE / 1000),
     "payment_intent_data[metadata][order]": o.id,
     billing_address_collection: "auto",     // never "required", and no shipping_address_collection
     success_url: `${origin}/order/${o.id}`,
@@ -110,13 +123,14 @@ export async function checkout(o: Pick<Order, "id" | "cart" | "lines">, origin: 
 export const session = (id: string) => stripe("checkout/sessions/" + id) as Promise<{ id: string; url: string | null; status: string; payment_status: string; metadata: Record<string, string> }>;
 
 export async function markPaid(sql: Awaited<ReturnType<typeof db>>, id: string, sessionId: string) {
-  await sql`update orders set status = 'paid', paid_at = now() where id = ${id} and status = 'new' and stripe_session = ${sessionId}`;
+  await sql`update orders set status = 'paid', paid_at = now() where id = ${id} and status in ('new', 'expired') and stripe_session = ${sessionId}`;   // Stripe takes no payment after expiry
 }
 
 // ---- USDC: read the chain ----
 let rpcId = 0;
 export async function rpc(chain: number, method: string, params: unknown[]) {
-  const res = await fetch(env("SHOP_RPC_" + chain) || PAY_CHAINS[chain].rpc, {
+  if (!env("SHOP_RPC_" + chain)) throw new Error("The shop can't read " + PAY_CHAINS[chain].name + " right now.");
+  const res = await fetch(env("SHOP_RPC_" + chain), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
   });
@@ -128,7 +142,8 @@ const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 const topicOf = (a: string) => "0x" + a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 
 /** Did this transaction pay this order? The amount's last digits are unique among open orders on the
- * chain, and the transaction must come after the order was made, so a hash can't pay someone else's. */
+ * chain, and it must land between the order's making and its quote running out, so a hash can't pay
+ * someone else's and a late one can't buy at an old price. */
 export async function usdcPaid(o: Order, tx: string): Promise<{ paid: true; payer: string } | { paid: false; why: string }> {
   const c = PAY_CHAINS[o.chain!];
   const r = await rpc(o.chain!, "eth_getTransactionReceipt", [tx]);
@@ -139,8 +154,22 @@ export async function usdcPaid(o: Order, tx: string): Promise<{ paid: true; paye
     && BigInt(l.data) === BigInt(o.usdc!));
   if (!log) return { paid: false, why: `That transaction didn't send exactly ${fmtUsdc(o.usdc!)} USDC to the shop on ${c.name}.` };
   const [block, head] = await Promise.all([rpc(o.chain!, "eth_getBlockByNumber", [r.blockNumber, false]), rpc(o.chain!, "eth_blockNumber", [])]);
-  if (Number(BigInt(block.timestamp)) * 1000 < Date.parse(o.created) - 120_000) return { paid: false, why: "That transaction is older than this order." };
+  const at = Number(BigInt(block.timestamp)) * 1000, made = Date.parse(o.created);
+  if (at < made - 120_000) return { paid: false, why: "That transaction is older than this order." };
+  if (at > made + QUOTE + 30_000) return { paid: false, why: "That payment came after the 10 minutes ran out. Write to wedgie@buidlguidl.com for a refund." };
   if (BigInt(head) - BigInt(r.blockNumber) + 1n < BigInt(c.confirm)) return { paid: false, why: "Waiting for confirmations." };
   return { paid: true, payer: "0x" + log.topics[1].slice(-40) };
+}
+
+/** Look for this order's payment on chain (any wallet, e.g. from the QR code): a transfer of its exact
+ * amount to the shop, in the blocks of its 10 minutes. Returns the transaction, or null. */
+export async function usdcFind(o: Order): Promise<string | null> {
+  if (o.from_block == null) return null;
+  const c = PAY_CHAINS[o.chain!], head = Number(BigInt(await rpc(o.chain!, "eth_blockNumber", [])));
+  const from = Number(o.from_block) - 2, to = Math.min(head, Number(o.from_block) + Math.ceil((QUOTE + 60_000) / 1000 / c.secs));
+  if (to < from) return null;
+  const logs = await rpc(o.chain!, "eth_getLogs", [{ address: c.usdc, fromBlock: "0x" + from.toString(16), toBlock: "0x" + to.toString(16),
+    topics: [TRANSFER, null, topicOf(env("SHOP_PAY_TO"))] }]) as { data: string; transactionHash: string }[];
+  return logs.find((l) => BigInt(l.data) === BigInt(o.usdc!))?.transactionHash || null;
 }
 export const fmtUsdc = (u: string | bigint) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0")}`; };
