@@ -4,7 +4,7 @@
 //  - raw: the raw REPL, for writes and for an app that has USB to itself (the Wallet). The caller
 //    stops the app first (install.ts takeOver) and starts it again after.
 // Saves live in /saves/<game>/ (firmware/save.py). A bundle ({"wedgie-saves": 1, files: {path: base64}})
-// is how they leave the wedgie and come back: the Saves card's download, and /format's backup.
+// is how they leave the wedgie and come back: the Saves card's download, and /test's backup.
 import type { Repl } from "./repl";
 
 export type Entry = { path: string; size: number; dir: boolean };

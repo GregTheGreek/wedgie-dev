@@ -394,7 +394,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     }
   }
   onProgress(0, "stopping what it runs");
-  if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, "Installing firmware"); }   // a board already in the raw REPL (/format's bench)
+  if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, "Installing firmware"); }   // a board already in the raw REPL (/test's bench)
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Update firmware to ${m.version}`);
   onProgress(0.02, "checking what's on it");
   const have = await look(r, allNames(m));

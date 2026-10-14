@@ -1,5 +1,5 @@
-// /format (and /test): wipe a wedgie, set it up fresh, test it. Plug it in, press Format, do what its
-// own screen says, unplug. Nothing starts until Format is pressed (a wedgie plugged in here by mistake
+// /test (was /format): wipe a wedgie, set it up fresh, test it. Plug it in, press Test it, do what its
+// own screen says, unplug. Nothing starts until Test it is pressed (a wedgie plugged in here by mistake
 // keeps everything). A used wedgie's saves (/saves) are copied into this browser first and put back
 // after the new firmware goes on, unless "wipe its saves too" is ticked; a backup that couldn't be put
 // back (unplugged mid-way) waits here, by board ID, for that board to come back. With the test-bench
@@ -43,7 +43,7 @@ function boardName(b: any) {
   return `${b.cpu} board (not a Raspberry Pi Pico)`;
 }
 
-/** The one-time Chrome setup both benches need (/format, /update): the profile that lets wedgie.dev use
+/** The one-time Chrome setup both benches need (/test, /update): the profile that lets wedgie.dev use
  *  every Pico without asking, so a bench runs hands-off. */
 export function benchSetup() {
   return `<div class="test-setup card">
@@ -63,7 +63,7 @@ export function format(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>Format a wedgie</h1>
+    <h1>Test a wedgie</h1>
     <div class="boot-hint card" id="t-hint" hidden>
       <div class="boot-hint-3d" id="t-hint-3d"></div>
       <div><h3>Hold BOOTSEL, plug it in</h3>
@@ -72,7 +72,7 @@ export function format(main: HTMLElement) {
     </div>
     <div class="test-status">
       <div class="status-text" id="t-text">Plug in a wedgie</div>
-      <div class="status-detail" id="t-detail">New or used. Nothing happens until you press Format.</div>
+      <div class="status-detail" id="t-detail">New or used. Nothing happens until you press Test it.</div>
       <div class="meter" id="t-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div></div>
     </div>
     <div class="test-grid" id="t-grid"></div>
@@ -80,7 +80,7 @@ export function format(main: HTMLElement) {
     <div class="test-id" id="t-id"></div>
     <dl class="kv test-facts" id="t-facts" hidden></dl>
     <label class="fine test-wipe"><input type="checkbox" id="t-wipe"> Wipe its saves too</label>
-    <p class="fine">Format wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip, its wires while you shake it, and every button. It ends with no app on it. Its saves are kept unless you tick the box.</p>
+    <p class="fine">Test wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip, its wires while you shake it, and every button. It ends with no app on it. Its saves are kept unless you tick the box.</p>
     ${benchSetup()}
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -113,7 +113,7 @@ export function format(main: HTMLElement) {
   };
 
   let busy = false;
-  let go = false;                 // Format was pressed for the unit on the bench now
+  let go = false;                 // Test it was pressed for the unit on the bench now
   let flashedAt = 0;              // we just put MicroPython on a unit: the next serial board is it
   let wantWifi = false;           // the next flash is the W build (the unit has the WiFi chip)
   let waitBoot = 0;               // a unit was told to reboot into BOOTSEL
@@ -421,11 +421,11 @@ export function format(main: HTMLElement) {
     }
     if (!flashedAt && !waitBoot && !actions.innerHTML && !justEnded) idle();
   }
-  // A unit is plugged in: nothing happens to it until Format is pressed.
+  // A unit is plugged in: nothing happens to it until Test it is pressed.
   function ask(what: string, uid?: string) {
     const kept = backup(uid);
-    status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.` : "Format wipes it and sets it up fresh, then tests it.");
-    if (!document.getElementById("t-go")) buttons(`<button class="btn btn-green" id="t-go">Format it</button>`);
+    status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.` : "Test it wipes it, sets it up fresh, then tests it.");
+    if (!document.getElementById("t-go")) buttons(`<button class="btn btn-green" id="t-go">Test it</button>`);
     $("t-go").onclick = () => { go = true; buttons(""); pick(); };
   }
   // Without the profile, the first sight of a unit needs a tap.
@@ -437,7 +437,7 @@ export function format(main: HTMLElement) {
 
   draw();
   if (!W.supported() || !usbSupported()) {
-    status("Can't see USB here", "Open wedgie.dev/format in Chrome or Edge on a computer.", "bad");
+    status("Can't see USB here", "Open wedgie.dev/test in Chrome or Edge on a computer.", "bad");
     return;
   }
   navigator.usb.addEventListener("connect", (e) => { if (isBoot((e as USBConnectionEvent).device)) setTimeout(pick, 300); });

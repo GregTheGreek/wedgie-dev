@@ -1,4 +1,4 @@
-// /connect's "set it up" card: a board that has no wedgie firmware yet, at the top of the list. What /format
+// /connect's "set it up" card: a board that has no wedgie firmware yet, at the top of the list. What /test
 // does to a new unit, minus the tests: a Pico in BOOTSEL (a blank one boots there; WebUSB, not serial, so the
 // Connect picker never lists it) gets wiped + MicroPython (picoboot.ts), the W build if it has the Pico W's
 // WiFi chip, then the wedgie firmware core. Its app gets picked on its own page after.
@@ -112,7 +112,7 @@ export function setupCard(el: HTMLElement) {
     try {
       await W.withRepl(w, async (r) => {
         await r.enter({ reset: true });          // bare MicroPython: no drive, a reset is safe
-        // A Pico W on the plain build: go round once more for the W build (as /format does).
+        // A Pico W on the plain build: go round once more for the W build (as /test does).
         await r.exec(await W.probe(), 10000);
         await r.exec(await benchPy(), 10000);
         let b: any = null;

@@ -350,7 +350,7 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
 
 ## First boot, in order
 
-1. **MicroPython.** The easy way: https://wedgie.dev/format in Chrome does steps 1-4 itself. By hand:
+1. **MicroPython.** The easy way: https://wedgie.dev/test in Chrome does steps 1-4 itself. By hand:
    hold BOOTSEL while plugging in; a drive (RPI-RP2 or RP2350) appears; drag the `.uf2` for that board
    from https://micropython.org/download/ (RPI_PICO for RP2040 boards and clones, RPI_PICO_W for a Pico
    W, RPI_PICO2_W for a Pico 2 W) onto it. It restarts as a serial port.
@@ -378,14 +378,14 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
 4. **The screen:** Test the screen on its page. Stripes or nothing with the backlight on: reseat the hat.
 5. **The buttons:** Test the buttons on its page lists which work. "Held from the start": a cap presses
    the switch all the time. Never registers: the switch itself.
-6. **Still broken: https://wedgie.dev/format.** It copies the saves into the browser, wipes the whole
+6. **Still broken: https://wedgie.dev/test.** It copies the saves into the browser, wipes the whole
    Pico (BOOTSEL), puts MicroPython on (the W build if it has WiFi), then the firmware, puts the saves
    back, and tests the board, the screen, every button and the chip. Nothing starts until its Format
    button is pressed. It never touches the secure chip.
 
 **A dead or locked secure chip:** it's its own little board, so swap in a new breakout. Keys made inside
 the old chip are gone with it: anything they guarded (a wallet whose key lived on that chip) can only
-come back through that wallet's own recovery. A reflash or /format never erases the chip.
+come back through that wallet's own recovery. A reflash or /test never erases the chip.
 
 ## Firmware and apps
 

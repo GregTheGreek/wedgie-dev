@@ -18,7 +18,8 @@ import { order } from "./pages/order";
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
 const onAssemble = path === "/assemble";
-const onFormat = path === "/format" || path === "/test";
+const onFormat = path === "/test" || path === "/format";   // /format: its old name
+if (path === "/format") history.replaceState(null, "", "/test");
 const onUpdate = path === "/update";
 const onBuild = path === "/build";
 const onCode = path === "/code";

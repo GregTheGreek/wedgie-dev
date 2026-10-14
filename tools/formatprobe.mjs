@@ -1,4 +1,4 @@
-// Drives /format end to end with fakes: Chrome as if the test-bench profile were installed
+// Drives /test (was /format) end to end with fakes: Chrome as if the test-bench profile were installed
 // (every Pico is visible without a picker) unless a scenario says noProfile. The fake Pico is strict
 // about PICOBOOT (command blocks, tokens, ack phases, flash only clearing bits), reboots into bare
 // MicroPython (raw REPL, a real little filesystem for the firmware install), answers board()/chip()/
@@ -278,7 +278,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
   if (sc.page === "connect") { await connectRun(sc, ctx, page, errs); await ctx.close(); continue; }
-  await page.goto(base + "test");     // /test is /format
+  await page.goto(base + "format");   // the old name: it lands on /test
   const notes = [];
   if (sc.wipe) await page.check("#t-wipe");
   if (!sc.noProfile) {

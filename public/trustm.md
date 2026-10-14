@@ -168,7 +168,7 @@ c.read(optiga.DATA[0])                          # b"hello!"
 c.read(optiga.CERT, 0, 64)                      # a slice: offset, length
 ```
 - `DATA` objects hold 140 bytes, `BIG_DATA` 1500. Writing past the end raises error `0x08`.
-- What's in the chip survives a reflash of the wedgie (a wipe at /format erases the Pico's flash, not
+- What's in the chip survives a reflash of the wedgie (a wipe at /test erases the Pico's flash, not
   the chip). It's a good place for something an app must find again after a reinstall.
 - Anyone who can run code on the wedgie can read and write these as shipped. For secrets that must
   stay inside, use a key slot (nothing reads a private key) or change the object's read rule (metadata).

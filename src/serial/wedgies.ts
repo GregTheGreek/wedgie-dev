@@ -52,7 +52,7 @@ try { armedNow = localStorage.getItem(ARM) === "1"; } catch {}
 const onArm: (() => void)[] = [];
 /** This browser has asked for a wedgie here before, so looking at its serial ports prompts nothing new. */
 export const armed = () => armedNow;
-/** Start looking at serial ports: a deliberate act (a Connect tap, the /format bench). */
+/** Start looking at serial ports: a deliberate act (a Connect tap, the /test bench). */
 export function arm() {
   if (armedNow) return;
   armedNow = true;

@@ -1,7 +1,7 @@
 // /update: the update bench. Plug wedgies in, as many at once as there are ports; each gets the latest
 // firmware core by itself, and its app if that's out of date. Its app and its saves stay. A card per
 // wedgie here, and a bar on its own screen; when it has restarted on the new firmware its card goes
-// green. Hands-off once the computer has the test-bench profile (same as /format).
+// green. Hands-off once the computer has the test-bench profile (same as /test).
 //
 // USB and resets: the update's one soft reset boots the new core. A wedgie that powered up on firmware
 // older than 0.1.3 then adds its WEDGIE drive, so its port drops and comes back as a new one; 0.1.3+
