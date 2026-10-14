@@ -306,57 +306,116 @@ def _r(n):
     raise OSError("read not acked")
 
 
-def shake(speeds):
-    """Hammer the Trust M while its person shakes the wedgie: 200 bytes of its certificate, 32 random
-    bytes, a fresh P-256 key pair (hard work: the most current the chip draws, so a weak power or ground
-    wire shows), and SHA-256 of 200 random bytes (what we send checked too), over and over, each answer
-    checked. Counts every try the wires missed (trustm.py retries those quietly), every error and every
-    wrong answer. speeds: [[Hz, seconds], ...]. Nothing that wears the chip: no writes to its memory, no
-    stored key used (the key pair is handed out, nothing kept), a restart only after an error."""
-    import trustm, hashlib
+# The Pico's own load: a 4 KB block written and read back over and over (each sum must come out the
+# same), on its second core while the first works the chip. Nothing allocated in the loop but range().
+_go = [0]           # 1: core 1 keeps pounding
+_core = [0, 0, 0]   # passes, wrong sums, 1 while running
+
+
+def _pass(buf):
+    k = (_core[0] * 7) & 255
+    for i in range(len(buf)):
+        buf[i] = (i + k) & 255
+    t = 0
+    for i in range(len(buf)):
+        t += buf[i]
+    return t == len(buf) // 256 * 32640
+
+
+def _core1(buf):
+    _core[2] = 1
+    while _go[0]:
+        _core[1] += not _pass(buf)
+        _core[0] += 1
+    _core[2] = 0
+
+
+def _sense(m):
+    """Temperature (C) and VSYS (mV): the lowest and highest seen, into m."""
+    from machine import ADC
+    c = 27 - (ADC(4).read_u16() * 3.3 / 65535 - 0.706) / 0.001721
+    v = ADC(29).read_u16() * 9900 // 65535
+    m[0], m[1] = min(m[0], c), max(m[1], c)
+    m[2], m[3] = min(m[2], v), max(m[3], v)
+
+
+def shake(plan):
+    """Pound the wedgie while its person shakes it, in phases: [[what, Hz, seconds], ...], what is
+    "pico" (both cores write and check RAM, the screen redraws), "chip" (the Trust M alone) or "both".
+    The chip work: 200 bytes of its certificate, 32 random bytes, a fresh P-256 key pair (hard work: the
+    most current the chip draws, so a weak power or ground wire shows), and SHA-256 of 200 random bytes
+    (what we send checked too), each answer checked. Counts every try the wires missed (trustm.py
+    retries those quietly), every error and every wrong answer; the lowest/highest temperature and VSYS.
+    Nothing that wears the chip: no writes to its memory, no stored key used (the key pair is handed
+    out, nothing kept), a restart only after an error."""
+    import trustm, hashlib, _thread
     keep = trustm._write, trustm._read
     trustm._write, trustm._read = _w, _r
-    total = sum(s for _, s in speeds)
+    total = sum(p[2] for p in plan)
     gone = 0
+    buf0, buf1 = bytearray(4096), bytearray(4096)
+    s = None
     try:
-        for hz, secs in speeds:
+        for what, hz, secs in plan:
             ops = err = bad = 0
             last = ""
-            trustm.bus(4, 5, hz)
-            s = trustm.Session()
-            cert = s.get(0xE0E0, 0, 200)
-            prev = b""
+            m = [999, -999, 99999, 0]
+            _core[0] = _core[1] = 0
+            mine = [0, 0]   # core 0's own passes, wrong sums (the pico phase)
+            chip = what != "pico"
+            if chip:
+                trustm.bus(4, 5, hz)
+                s = trustm.Session()
+                cert = s.get(0xE0E0, 0, 200)
+                prev = b""
             _miss[0] = 0
+            if what != "chip":
+                _go[0] = 1
+                _thread.start_new_thread(_core1, (buf1,))
             t0 = tl = time.ticks_ms()
-            _say("SHAKE IT", str(total - gone), _GREEN, _PAPER)
+            _say("SHAKE IT", "%s %d" % (what.upper(), total - gone), _GREEN, _PAPER)
             while time.ticks_diff(time.ticks_ms(), t0) < secs * 1000:
-                try:
-                    k = ops % 4
-                    if k == 0:
-                        ok = s.get(0xE0E0, 0, 200) == cert
-                    elif k == 3:
-                        m = os.urandom(200)
-                        ok = s.command(0x30, 0xE2, b"\x01\x00\xc8" + m)[3:] == hashlib.sha256(m).digest()
-                    else:
-                        r = s.random(32) if k == 1 else s.command(0x38, 0x03, b"\x07\x00\x00")   # GenKeyPair P-256
-                        ok = (len(r) == 32 if k == 1 else len(r) > 80) and r != prev
-                        prev = r
-                    ops += 1
-                    bad += not ok
-                except Exception as e:
-                    err += 1
-                    last = str(e)[:40]
+                if not chip:
+                    mine[1] += not _pass(buf0)
+                    mine[0] += 1
+                else:
                     try:
-                        s = trustm.Session()
-                    except Exception:
-                        pass
+                        k = ops % 4
+                        if k == 0:
+                            ok = s.get(0xE0E0, 0, 200) == cert
+                        elif k == 3:
+                            d = os.urandom(200)
+                            ok = s.command(0x30, 0xE2, b"\x01\x00\xc8" + d)[3:] == hashlib.sha256(d).digest()
+                        else:
+                            r = s.random(32) if k == 1 else s.command(0x38, 0x03, b"\x07\x00\x00")   # GenKeyPair P-256
+                            ok = (len(r) == 32 if k == 1 else len(r) > 80) and r != prev
+                            prev = r
+                        ops += 1
+                        bad += not ok
+                    except Exception as e:
+                        err += 1
+                        last = str(e)[:40]
+                        try:
+                            s = trustm.Session()
+                        except Exception:
+                            pass
+                _sense(m)
                 if time.ticks_diff(time.ticks_ms(), tl) >= 1000:
                     tl = time.ticks_ms()
                     left = total - gone - time.ticks_diff(tl, t0) // 1000
-                    _say("SHAKE IT", str(max(left, 0)), _RED if err or bad else _GREEN, _PAPER)
-                    out("shake", {"hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad, "left": left})
+                    sick = err or bad or _core[1] or mine[1]
+                    _say("SHAKE IT", "%s %d" % (what.upper(), max(left, 0)), _RED if sick else _GREEN, _PAPER)
+                    out("shake", {"what": what, "hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad,
+                                  "ram": _core[0] + mine[0], "ramBad": _core[1] + mine[1], "left": left})
+            _go[0] = 0
+            t = time.ticks_ms()
+            while _core[2] and time.ticks_diff(time.ticks_ms(), t) < 3000:
+                time.sleep_ms(5)
             gone += secs
-            out("shook", {"hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad, "last": last})
+            out("shook", {"what": what, "hz": hz, "ops": ops, "miss": _miss[0], "err": err, "bad": bad, "last": last,
+                          "ram": _core[0] + mine[0], "ramBad": _core[1] + mine[1],
+                          "temp": [round(m[0], 1), round(m[1], 1)], "vsys": [m[2], m[3]]})
     finally:
+        _go[0] = 0
         trustm._write, trustm._read = keep
         trustm.bus(4, 5)

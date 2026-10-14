@@ -30,7 +30,7 @@ function expected(file, family) {
 
 const ATECC = { type: "ATECC608", serial: "0123abcd4455667788", revision: "00006002", configLocked: true, dataLocked: true };
 const TM = { type: "OPTIGA Trust M", state: "08800000", uid: "cd16336601001c000100000000000000000000000000000000000000" };
-const ALLPASS = ["pass", "pass", "pass", "skip", "pass", "pass"];   // Shake: Trust M only
+const ALLPASS = ["pass", "pass", "pass", "pass", "pass", "pass"];
 // pid: the chip (3 = RP2040, 15 = RP2350). wifi: the board has the Pico W's WiFi chip. used: it starts
 // as a wedgie on 0.1.1. combo: the joystick's UP comes with IN once. unplugAt: pulled out at that button.
 const scenarios = [
@@ -41,8 +41,8 @@ const scenarios = [
   { name: "used-saves", pid: 3, used: true, saves: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "used-wipe", pid: 3, used: true, saves: true, wipe: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "sticky-joy", pid: 3, combo: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
-  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "skip", "pass", "pass"]], uf2: "RPI_PICO" },
-  { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "skip", "fail", "skip"]], uf2: "RPI_PICO" },
+  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "pass", "pass", "pass"]], uf2: "RPI_PICO" },
+  { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "pass", "fail", "skip"]], uf2: "RPI_PICO" },
   // A Trust M: its chip check fails here (a fake can't chain to Infineon), the shake still runs.
   { name: "trustm-shake", pid: 3, found: [TM], want: ["FAIL", ["pass", "pass", "fail", "pass", "pass", "pass"]], uf2: "RPI_PICO" },
   { name: "trustm-loose", pid: 3, found: [TM], loose: true, want: ["FAIL", ["pass", "pass", "fail", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
@@ -124,10 +124,11 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         let t = 0;
         const ev = (s) => { t += 40; setTimeout(() => live && push(s + "\r\n"), t); };
         push("OK");
-        for (const hz of [400000, 1000000]) {
-          const v = { hz, ops: 900, miss: sc.loose ? 40 : 0, err: sc.loose ? 3 : 0, bad: sc.loose ? 1 : 0 };
+        for (const [what, hz] of JSON.parse(c.slice(6, c.lastIndexOf(")")))) {
+          const chip = what !== "pico", loose = sc.loose && chip;
+          const v = { what, hz, ops: chip ? 900 : 0, miss: loose ? 40 : 0, err: loose ? 3 : 0, bad: loose ? 1 : 0, ram: chip && what === "chip" ? 0 : 500, ramBad: 0 };
           ev("@shake " + JSON.stringify({ ...v, left: 3 }));
-          ev("@shook " + JSON.stringify({ ...v, last: sc.loose ? "read not acked" : "" }));
+          ev("@shook " + JSON.stringify({ ...v, last: loose ? "read not acked" : "", temp: [24.1, 27.9], vsys: [4870, 4990] }));
         }
         t += 40; setTimeout(() => push("\x04\x04>"), t);
         return;

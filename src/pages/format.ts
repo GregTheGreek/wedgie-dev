@@ -10,8 +10,9 @@
 //  3. the wedgie firmware (before the buttons, so unplugging at the end is safe; its chip drivers);
 //  4. the chip, used without locking it: ATECC608 hashes on-chip, Trust M signs and its certificate
 //     chains to Infineon (chipcheck.ts);
-//  5. a Trust M's wires, shaken: its person shakes the wedgie while the chip is hammered at 400 kHz, then
-//     at 1 MHz (the margin), every answer checked, every missed try counted (bench.py shake);
+//  5. shaken: its person shakes the wedgie while it's pounded in phases: the Pico (both cores write and
+//     check RAM), the Trust M alone, then both; the chip at 400 kHz, then at 1 MHz (the margin, reported
+//     only). Every answer checked, every missed try counted, temperature and VSYS watched (bench.py shake);
 //  6. on its screen: each button alone, in order; then each again, filling the screen with its color.
 // It ends with the latest firmware and no app (one gets picked at /connect).
 import * as W from "../serial/wedgies";
@@ -28,7 +29,9 @@ const ICON: Record<State, string> = { waiting: "", running: "…", pass: "✓", 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const RAW = "raw REPL; CTRL-B to exit\r\n>";
 const BOARD = 0, FW = 1, CHIP = 2, SHAKE = 3, BUTTONS = 4, COLORS = 5;
-const SHAKE_AT: [number, number][] = [[400000, 30], [1000000, 15]];   // [Hz, seconds]: the wedgie's own speed, then the margin
+// [what, Hz, seconds]: the Pico alone, the Trust M alone, both, both at 1 MHz (the margin). No Trust M: the Pico only.
+const SHAKE_AT: [string, number, number][] = [["pico", 0, 10], ["chip", 400000, 15], ["both", 400000, 15], ["both", 1000000, 10]];
+const PHASE: Record<string, string> = { pico: "Pico", chip: "Trust M", both: "Both" };
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 
@@ -259,25 +262,30 @@ export function format(main: HTMLElement) {
           }
           set(CHIP, c.pass ? "pass" : "fail", c.detail); step = SHAKE;
 
-          if (c.kind === "trustm") {
+          {
             set(SHAKE, "running", "Shake it");
             status("Shake it", "Shake, tap and squeeze the wedgie until its screen stops counting.");
             const shook: any[] = [];
+            const name = (v: any) => PHASE[v.what] + (v.what === "pico" ? "" : ` ${v.hz / 1000} kHz`);
             r.onLine = (t, v) => {
-              if (t === "shake") set(SHAKE, "running", `${v.hz / 1000} kHz · ${v.ops} checks · ${v.err + v.bad} errors · ${v.miss} retries · ${v.left} s`);
+              if (t === "shake") set(SHAKE, "running", `${name(v)} · ${v.what === "pico" ? `${v.ram} RAM checks` : `${v.ops} chip checks`} · ${v.err + v.bad + v.ramBad} errors · ${v.left} s`);
               if (t === "shook") shook.push(v);
             };
-            await r.exec(`shake(${JSON.stringify(SHAKE_AT)})`, 120000);
-            const [held, fast] = shook;
-            if (!held) throw new Error("No answer from the shake test");
-            const line = (v: any) => `${v.ops} checks, ${v.err} errors, ${v.bad} wrong, ${v.miss} retries${v.last ? ` (${v.last})` : ""}`;
-            fact("Shaken at 400 kHz", line(held));
-            if (fast) fact("At 1 MHz", line(fast));
-            const ok = !held.err && !held.bad && held.ops > 0;
-            set(SHAKE, ok ? "pass" : "fail", ok
-              ? `${held.ops} checks, all right${held.miss ? `, ${held.miss} retries` : ""} · 1 MHz ${fast && !fast.err && !fast.bad ? "ok" : "fails"}`
-              : `${held.err + held.bad} of ${held.ops + held.err} failed. A wire is loose.`);
-          } else set(SHAKE, "skip", c.pass ? "Trust M only" : "");
+            const plan = c.kind === "trustm" ? SHAKE_AT : SHAKE_AT.filter((p) => p[0] === "pico");
+            await r.exec(`shake(${JSON.stringify(plan)})`, 180000);
+            if (shook.length < plan.length) throw new Error("No answer from the shake test");
+            const errs = (v: any) => v.err + v.bad + v.ramBad;
+            for (const v of shook) {
+              const work = [v.what !== "chip" && `${v.ram} RAM checks`, v.what !== "pico" && `${v.ops} chip checks`, `${errs(v)} errors`,
+                v.miss && `${v.miss} retries`].filter(Boolean).join(", ");
+              fact(name(v), `${work}${v.last ? ` (${v.last})` : ""} · ${v.temp[0]}-${v.temp[1]} °C · ${(v.vsys[0] / 1000).toFixed(2)}-${(v.vsys[1] / 1000).toFixed(2)} V`);
+            }
+            const held = shook.filter((v) => v.hz < 1000000), fast = shook.find((v) => v.hz >= 1000000);
+            const failed = held.filter((v) => errs(v) || (v.what === "pico" ? !v.ram : !v.ops));
+            set(SHAKE, failed.length ? "fail" : "pass", failed.length
+              ? `${failed.map(name).join(", ")}: ${failed.map(errs).reduce((a, b) => a + b, 0)} errors.${failed.some((v) => v.what !== "pico") ? " A wire is loose." : ""}`
+              : `No errors${fast ? ` · 1 MHz ${errs(fast) ? "fails" : "ok"}` : ""}`);
+          }
           step = BUTTONS;
 
           status("Follow its screen", "Each button on its own, in order. Then each again for its color.");
