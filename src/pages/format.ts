@@ -20,7 +20,7 @@
 // second pass, once its case is on). A on its screen lets the page in; after, it goes back to its app.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { installCore, letIn, takeOver, firmwareManifest } from "../serial/install";
+import { installCore, letIn, firmwareManifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
@@ -217,8 +217,15 @@ export function format(main: HTMLElement) {
     try {
       await W.withRepl(w, async (r) => {
         try {
-          if (keep) await takeOver(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer test it."), "Test it", "Testing");
-          else await r.enter();
+          // keep: after the A, a soft reset into the raw REPL: a fresh heap with only boot.py's screen on it
+          // (main.py doesn't run). Testing over the loaded firmware ran an RP2040 out of memory at the
+          // shake (11520, the bench's stripe). Only boards on the latest firmware get here: it has the
+          // soft-reset mark, so the port stays.
+          if (keep) {
+            await letIn(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer test it."), "Test it");
+            await r.request({ type: "stop" }, 800).catch(() => {});
+          }
+          await r.enter();
           status("Testing…", "Don't unplug it.");
           await r.exec(await W.probe(), 10000);
           await r.exec(await benchPy(), 10000);
