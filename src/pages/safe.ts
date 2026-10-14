@@ -191,6 +191,9 @@ export function safe(main: HTMLElement) {
   /** The wedgie's owner slots on this Safe: one, or Instant Wallet's two (one press signs for both). */
   const ownedBy = () => (info ? info.owners.filter(mine) : []);
   const wedgieOwns = () => ownedBy().length > 0;
+  /** Instant Wallet's Safe: the wedgie is an owner through one of IW's two signer addresses. */
+  const isIW = (owners: string[]) => signers.slice(1).some((s) => owners.some((o) => eqA(o, s)));
+  const iwMark = `<img class="iw-mark" src="/img/instantwallet.png" alt="Instant Wallet" title="Instant Wallet">`;
   const nextNonce = () => Math.max(info!.nonce, ...queue.map((t) => +t.nonce + 1));
   const threshOpts = (n: number, at: number) => Array.from({ length: n }, (_, i) => `<option${i + 1 === at ? " selected" : ""}>${i + 1}</option>`).join("");
   const label = (a: string) => mine(a) ? " <b>this wedgie</b>" : eqA(a, account) ? " <b>your wallet</b>" : "";
@@ -412,7 +415,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const row = (r: Row) => {
       const i = r.info;
-      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${address(r.addr, { chain: r.chain })}
+      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}
         <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
         ${r.wedgie ? `<span class="safe-open">Open →</span>` : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
     };
@@ -514,7 +517,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const c = CHAINS[chain];
     let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a></p>
-      <h2>Safe on ${esc(c.name)}</h2>
+      <h2>${info && isIW(info.owners) ? `${iwMark}Instant Wallet ` : ""}Safe on ${esc(c.name)}</h2>
       <p>${address(safeAddr, { link: c.scan, size: "lg", long: true, chain })}</p>`;
     if (info) {
       const i = info, canChange = wedgieOwns() || isOwner(account);
