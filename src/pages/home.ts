@@ -75,7 +75,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div class="signer-copy">
         <span class="kicker">Safe signer</span>
         <h2>Sign for a Safe.</h2>
-        <p>A wedgie can be an owner on a Safe multisig, the same as a hardware wallet. It uses Safe's own contracts, already audited and holding billions. Nothing new to trust: the key never leaves the chip, and nothing signs until you press the green button.</p>
+        <p>A wedgie can sign for a Safe multisig with Safe's own audited contracts. The key never leaves the chip, and nothing signs until you press the green button.</p>
         <div class="row"><a class="btn btn-sm" href="/safe">Use it with a Safe →</a></div>
       </div>
       <div class="deed" aria-hidden="true">
