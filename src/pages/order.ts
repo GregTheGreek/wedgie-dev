@@ -5,7 +5,7 @@
 // finds it on chain. A quote holds 10 minutes (USDC) or 30 (card), with a countdown; then it's expired.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, BUMP, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, BUMP, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import qrcode from "qrcode-generator";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
@@ -179,7 +179,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
         <div class="order-qr">${q.createSvgTag({ cellSize: 5, margin: 2, scalable: true })}</div>
         <p class="fine">Scan with your phone's wallet. Exact amount: <b>${usdc(v.usdc!)}</b> USDC (the last digits tell us it's you).</p>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>
-        <p class="fine">Or send it to <code class="safe-addr">${esc(v.payTo || "")}</code>. We see it on its own.
+        <p class="fine">Or send it to ${(v.payTo || "").toLowerCase() === SHOP_ENS.address.toLowerCase() ? `<b>${SHOP_ENS.name}</b> ` : ""}<code class="safe-addr">${esc(v.payTo || "")}</code>. We see it on its own.
         Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>`;
     }
     if (v.status === "expired") h += `<p><b>Time ran out.</b> Nothing was charged.</p><p><a class="btn btn-green" href="/order">Start over</a></p>`;

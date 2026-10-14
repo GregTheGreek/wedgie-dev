@@ -43,6 +43,8 @@ export function cartOk(c: unknown): c is Cart {
 // on every one: a chain goes here only once the Safe is deployed there). The server reads each chain through
 // SHOP_RPC_<chainId>. secs: block time, to find a payment's blocks; confirm: blocks to wait.
 // A USDC quote holds for QUOTE; a card one for Stripe's shortest checkout, 30 minutes.
+// The shop's Safe goes by its ENS name on the pay page.
+export const SHOP_ENS = { name: "wedgie.eth", address: "0xf5d3C7F2fACeAAc12A75d66e3BE4365A21d0d43C" };
 export const QUOTE = 10 * 60_000, CARD_QUOTE = 30 * 60_000;
 export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: string; confirm: number; secs: number }> = {
   8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 3, secs: 2 },
