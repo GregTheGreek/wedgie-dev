@@ -64,8 +64,7 @@ export function format(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Test a wedgie</h1>
-    <div class="test-safe"><b>Your keys are safe.</b>
-      <p>A wedgie is two parts: a small computer, and a secure chip that holds your keys. This wipes and resets the computer. It never changes the chip. Your saves come back too. Run it as often as you like.</p></div>
+    <p class="test-safe">This wipes and resets the computer. It never changes the chip. Your crypto is safe.</p>
     <div class="boot-hint card" id="t-hint" hidden>
       <div class="boot-hint-3d" id="t-hint-3d"></div>
       <div><h3>Hold BOOTSEL, plug it in</h3>
