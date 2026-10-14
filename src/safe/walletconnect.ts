@@ -27,7 +27,8 @@ export type Session = { topic: string; dapp: Dapp; chainId: number; safe: string
 
 type Kit = Awaited<ReturnType<typeof WalletKit.init>>;
 let kit: Promise<Kit> | null = null;
-let want: { safe: string; chainId: number } | null = null;     // the Safe a pasted link connects
+// the Safe a pasted link connects, and how that ends: the app confirmed the session, or it didn't
+let want: { safe: string; chainId: number; done: (e?: Error) => void } | null = null;
 let hooks: { onAsk: (a: Ask) => void; onChange: () => void; onError: (m: string) => void;
   receipt: (chainId: number, hash: string) => Promise<any> } | null = null;
 
@@ -55,18 +56,31 @@ export function start(h: NonNullable<typeof hooks>) {
   return kit.then(() => hooks?.onChange());
 }
 
-/** Connect an app: its wc: link, for this Safe. */
+/** Connect an app: its wc: link, for this Safe. Resolves only once the app has confirmed the session. */
 export async function pair(uri: string, safe: string, chainId: number) {
   if (!/^wc:/.test(uri.trim())) throw new Error("That isn't a WalletConnect link (it starts with wc:).");
-  want = { safe, chainId };
   const k = await kit!;
-  await k.pair({ uri: uri.trim() });
+  const ended = new Promise<void>((ok, no) => { want = { safe, chainId, done: (e) => (e ? no(e) : ok()) }; });
+  const slow = setTimeout(() => want?.done(new Error("The app never asked to connect. Copy a fresh link from it and paste that.")), 30_000);
+  try {
+    await k.pair({ uri: uri.trim() });
+    await ended;
+  } finally { clearTimeout(slow); want = null; }
 }
 
 async function onProposal(k: Kit, p: WalletKitTypes.SessionProposal) {
   const w = want;
   want = null;
   if (!w) { await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") }); return; }
+  try { await approve(k, p, w); w.done(); } catch (e: any) { w.done(e); }
+}
+
+async function approve(k: Kit, p: WalletKitTypes.SessionProposal, w: { safe: string; chainId: number }) {
+  // A link the app has already replaced (its QR refreshes every few minutes) gets a session nobody answers.
+  if (p.params.expiryTimestamp && p.params.expiryTimestamp * 1000 < Date.now()) {
+    await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") }).catch(() => {});
+    throw new Error("That link is old. Copy a fresh one from the app.");
+  }
   const chain = `eip155:${w.chainId}`;
   let namespaces;
   try {
@@ -76,7 +90,15 @@ async function onProposal(k: Kit, p: WalletKitTypes.SessionProposal) {
     await k.rejectSession({ id: p.id, reason: getSdkError("UNSUPPORTED_CHAINS") });
     throw new Error(`${p.params.proposer.metadata.name || "The app"} wants a chain this Safe isn't on. Switch the app to this Safe's chain and try again.`);
   }
-  await k.approveSession({ id: p.id, namespaces });
+  const s = await k.approveSession({ id: p.id, namespaces });
+  // Approved isn't connected: wait for the app to confirm, or say so and drop the session.
+  let ack = false;
+  for (let i = 0; i < 40 && !ack; i++) { await new Promise((r) => setTimeout(r, 500)); ack = !!k.getActiveSessions()[s.topic]?.acknowledged; }
+  if (!ack) {
+    await k.disconnectSession({ topic: s.topic, reason: getSdkError("USER_DISCONNECTED") }).catch(() => {});
+    hooks?.onChange();
+    throw new Error(`${p.params.proposer.metadata.name || "The app"} didn't answer. Keep its window open, copy a fresh link, and paste that.`);
+  }
   hooks?.onChange();
 }
 
@@ -137,7 +159,7 @@ async function callsStatus(chainId: number, id: string) {
 export async function sessions(): Promise<Session[]> {
   if (!kit) return [];
   const k = await kit;
-  return Object.values(k.getActiveSessions()).map((s) => ({ topic: s.topic, dapp: dappOf(k, s.topic), ...accountOf(k, s.topic) }));
+  return Object.values(k.getActiveSessions()).filter((s) => s.acknowledged).map((s) => ({ topic: s.topic, dapp: dappOf(k, s.topic), ...accountOf(k, s.topic) }));
 }
 
 export async function disconnect(topic: string) {
