@@ -56,7 +56,8 @@ function list(main: HTMLElement, go: (path: string) => void) {
     const ws = W.wedgies().filter((w) => !needsSetup(w));
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
-      actions.innerHTML = "";
+      actions.innerHTML = `<a class="btn btn-green" href="/" id="back-home">Back to wedgie.dev</a>`;
+      document.getElementById("back-home")!.onclick = (e) => { e.preventDefault(); go("/"); };
       return;
     }
     if (!ws.length) {
