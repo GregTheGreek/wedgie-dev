@@ -335,7 +335,9 @@ html, body { overflow-x: clip; }
 body.test-mode .top, body.test-mode .foot { display: none; }
 .test-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px; gap: 22px; text-align: center; }
 .test-page .band { width: 200px; margin: 0; }
-.test-safe { margin: 0; max-width: 520px; font-size: 20px; font-weight: 800; line-height: 1.35; }
+.test-safe { max-width: 520px; }
+.test-safe b { display: block; font-size: 28px; font-weight: 900; line-height: 1.2; }
+.test-safe p { margin: 8px 0 0; font-size: 18px; line-height: 1.45; }
 .test-page h1 { font-size: 15px; color: var(--muted); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .test-status { background: var(--shell); box-shadow: var(--shell-shadow); border-radius: 30px; padding: 30px 40px; display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(100%, 540px); }
 .status-text { font-size: 48px; font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
