@@ -451,9 +451,10 @@ export function format(main: HTMLElement) {
   }
   // Without the profile, the first sight of a unit needs a tap.
   function idle() {
-    buttons(`<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="t-new">pick a new Pico</a> · <a href="#" id="t-used">pick a used one</a></p>`);
-    $("t-new").onclick = (e) => { e.preventDefault(); pickBoot().then(() => pick(), () => {}); };
-    $("t-used").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
+    buttons(`<button class="btn btn-green" id="t-used">Pick it</button><button class="btn" id="t-new">New Pico</button>
+      <p class="fine">Plugged in and nothing happens? Chrome needs a tap: Pick it for a wedgie, New Pico for a blank one.</p>`);
+    $("t-new").onclick = () => { pickBoot().then(() => pick(), () => {}); };
+    $("t-used").onclick = () => { W.connectNew().catch(() => {}); };
   }
 
   let latest = "";                // the latest firmware's version: a wedgie on it can be tested as it is
