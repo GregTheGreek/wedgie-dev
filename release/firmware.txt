@@ -2,6 +2,7 @@ wedgie-release 1
 version 0.3.47
 fdf4bcc822cc89d7b445dd274720eec32b24a121b5fb5bf974270bf7773e0d8f  atecc.mpy
 5ac401b4dcabd6cfa942c011dc9280a9e7890acac41dcf787c2279c6d8a887f6  bar.bin
+9afe5f025fc1c6a559587dadfa1b59fdba605466fa2551b3d01bf3fc7fa1ea10  blackjack.py
 a3d8149f23d8c267e60da2e2d14cf42438b095f187c6f34c8486882a23a3f3b3  blocks.py
 bd642b583d91e28040234b418ee9ec6be839ce98ee1f726b00e7f8cd7d8966b0  boot.py
 d96481539fd09093781b3ffbd987375673ffc77c6188e9bce31af410a474638e  bunker.py
@@ -39,6 +40,7 @@ f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
 f002daddfb6579173e402cbfe20fe767940ddb7754994ef4a86ada6abee206be  wedgie.mpy
 2542a29749239854f282b95d5122dcc291ff88437d7ac562fa23ae16fb3086a2  wedgiedrive.mpy
+@app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
 @app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}

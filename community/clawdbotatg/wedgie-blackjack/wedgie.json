@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "blackjack",
+      "name": "Blackjack",
+      "about": "Beat the dealer to 21. The secure chip shuffles every hand.",
+      "files": [
+        "blackjack.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.5",
+      "label": "#168c34",
+      "icon": [
+        "............",
+        ".kkkkkk.....",
+        ".kwwwwk.....",
+        ".kwrwkkkkkk.",
+        ".kwrrkwwwwk.",
+        ".kwwrkwkkwk.",
+        ".kwwwkkkkwk.",
+        ".kkkkkwkkwk.",
+        ".....kwwwwk.",
+        ".....kkkkkk.",
+        "............",
+        "............"
+      ]
+    }
+  ]
+}

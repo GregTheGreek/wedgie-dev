@@ -215,6 +215,15 @@
       "v": {
         "g2048": "089e7cbb0c60"
       }
+    },
+    {
+      "repo": "clawdbotatg/wedgie-blackjack",
+      "sha": "58f48fc0f90c9368b436464899c1ea70960f2788",
+      "at": "2026-10-15T03:01:43Z",
+      "approved": "2026-10-15",
+      "v": {
+        "blackjack": "e6816fb56ac7"
+      }
     }
   ]
 }
