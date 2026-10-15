@@ -55,7 +55,7 @@ def png(px):
     b = io.BytesIO(); square(px).save(b, "PNG")
     return subprocess.run(["pngquant", "--speed", "1", "--strip", "64", "-"], input=b.getvalue(), capture_output=True, check=True).stdout
 # .icns and .ico written directly, each a list of those PNGs (iconutil re-encodes them to full color).
-ICNS_TYPES = {32: [b"icp5", b"ic11"], 64: [b"ic12"], 128: [b"ic07"]}   # 32 is also 16@2x, 64 is 32@2x
+ICNS_TYPES = {32: [b"ic11"], 64: [b"ic12"], 128: [b"ic07"]}   # 32 is 16@2x, 64 is 32@2x. No icp5: macOS 26 draws it as noise
 def make_icns(sizes):
     chunks = b""
     for px in sizes:
