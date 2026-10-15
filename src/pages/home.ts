@@ -70,7 +70,7 @@ export function home(main: HTMLElement): Promise<unknown> {
           <a class="btn btn-sm" href="${CASE}joystick.stl" download>Joystick</a>
           <a class="btn btn-sm" href="${CASE}button.stl" download>Button ×4</a>
         </div>
-        <p class="fine">Colors: white lid, black base, grey joystick, buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b> (Waveshare RP2040-Plus with a battery): print its own red <a href="${ATOMIC}base.stl" download>base</a> and black <a href="${ATOMIC}reset-button.stl" download>RESET button</a> instead of the base.</p>
+        <p class="fine">Colors: white lid, black base, grey joystick, buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b> (Waveshare RP2040-Plus with a battery): print its own red <a href="${ATOMIC}base.stl" download>base</a> and black <a href="${ATOMIC}aw-reset-plunger.stl" download>RESET button</a> instead of the base.</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
