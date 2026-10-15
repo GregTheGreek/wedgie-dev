@@ -14,6 +14,7 @@ Push to main = deploy (Vercel).
 
 X [@wedgiedev](https://x.com/wedgiedev) (log in with Google), Gmail wedgie@buidlguidl.com, ENS wedgie.eth.
 Passwords: `.env` here and `~/.wedgie-credentials.env`. Never in git. New account: add to both.
+The inbox: `python3 tools/mail.py list|read|send` (Gmail app password). Google 2-Step code: `python3 ~/.wedgie-totp.py`.
 
 ## Firmware rules
 
