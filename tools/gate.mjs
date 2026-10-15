@@ -8,6 +8,8 @@
 //     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
 //   - the guides match the firmware, and the WEDGIE drive's SKILL.md matches them (tools/test_docs.py)
+//   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M)
+//     and its signing runs in the shelf copy's memory (tools/safechip.mjs)
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
 // when 0.3.13 broke), and no real board. Run tools/boardprobe.py on one before telling anyone it works.
 //   node tools/gate.mjs            (needs uv; run from the tree being signed)
@@ -35,6 +37,8 @@ const jobs = [
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
   ["test_docs", ["python3", "tools/test_docs.py"]],
+  ["test_safekey", ["uv", "run", "-q", "--with", "cryptography", "python3", "tools/test_safekey.py"]],
+  ["safechip", ["node", "tools/safechip.mjs"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],

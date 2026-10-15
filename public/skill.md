@@ -43,6 +43,7 @@ A new wedgie says "no software" until an app is picked. That's normal.
 - **Limits, honestly:** an app runs with full power on the wedgie, so install only shelf apps or repos you
   trust (a repo added by hand is not signed). If someone has the wedgie in hand, they can press its buttons.
   A lost or broken chip takes its keys with it: keep a Safe's other owners or recovery in place.
+- **Safe Signer's key is locked for good** once made: not even an app can replace it (below).
 - Everything is open source (MIT): https://github.com/clawdbotatg/wedgie-dev
 
 ## Safe Signer
@@ -50,15 +51,15 @@ A new wedgie says "no software" until an app is picked. That's normal.
 Makes the wedgie an owner of a Safe{Wallet} (Base, Ethereum, Optimism, Arbitrum, and their testnets).
 App: `clawdbotatg/wedgie-safe`, on the shelf. Page: https://wedgie.dev/safe.
 
-- **The key is made by you, on the wedgie.** The first time Safe Signer opens it shows **No key** and
-  "make a key". Press green, then yes: the secure chip makes a new random key inside itself. Nobody has
-  ever seen it, including wedgie.dev. (On an ATECC608 chip the first key also locks the chip's settings
-  for good; the question says so.)
-- **Check it's yours.** If Safe Signer shows an address the very first time you open it, a key was made
-  before you got it. Don't use it: make a new one (below).
-- **A new key:** delete `/saves/safe` (`{"type":"rm","path":"/saves/safe"}`, no press needed), unplug,
-  plug back in, open Safe Signer, press green. The old key is replaced in the chip for good: remove it
-  from any Safe first.
+- **The key is made by you, on the wedgie, once.** The first time Safe Signer opens it shows **No key**
+  and "make a key". Press green, then yes: the secure chip makes a new random key inside itself and keeps
+  its public key too, then **locks both for good** (Trust M). Nobody has ever seen the key, including
+  wedgie.dev, and nothing can ever replace or erase it: no app, no computer, no one. There's no "new key".
+- **Check it's yours.** If Safe Signer shows an address the very first time you open it, someone made a
+  key before you got it. Don't use it: it can't be replaced, so the chip has to be swapped.
+- **Swap the chip** on the screen: the chip is locked with a key that isn't Safe Signer's. It never signs.
+- The key lives only in the chip, so a broken chip loses it: keep a second owner on your Safe.
+- Other apps use the chip's other key slots (trustm.md); they can't touch this one.
 - **Signing:** the page sends the transaction, the wedgie works out the hash itself, shows what it does,
   and signs only on green. Red says no.
 - On chain the key is a passkey-style owner (P-256, Safe's WebAuthn signer). The wedgie shows its owner

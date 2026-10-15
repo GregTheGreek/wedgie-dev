@@ -146,7 +146,7 @@ export function safe(main: HTMLElement) {
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
   document.getElementById("connect-btn")?.before($("s-me"));   // the wedgie's address sits beside its Connected button
-  let key: { x: string; y: string } | null = null, signer = "", signers: string[] = [], wedgie: W.Wedgie | null = null, asking = false, noKey = false;
+  let key: { x: string; y: string } | null = null, signer = "", signers: string[] = [], wedgie: W.Wedgie | null = null, asking = false, noKey: boolean | string = false;
   // In the iPhone app there's no serial port: the wedgie is reached through its WEDGIE drive (serial/drive.ts).
   const DRIVE = { key: -1, state: "ready", running: "safe", short: "", log: "" } as unknown as W.Wedgie;
   let driveState = "";
@@ -277,7 +277,9 @@ export function safe(main: HTMLElement) {
     else if (!Drive.inApp() && !W.armed()) h += `<p class="row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>${HOME}`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
-    else if (!key) h += noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
+    else if (!key) h += noKey === "swap" ? `<p><b>This wedgie's chip is locked with a key that isn't Safe Signer's.</b> It never signs with it. Swap the chip.</p>`
+      : noKey === "lock" ? `<p><b>Its key is from before keys were locked.</b> On the wedgie: green locks it for good (only if you made it), red makes your own.</p>`
+      : noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it, locks it for good, and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
     else {
       if (safeAddr) {
         const d = deployed[chain];
@@ -302,7 +304,7 @@ export function safe(main: HTMLElement) {
     try {
       const h = await ask(w, (r) => r.request({ type: "hello" }, 5000));
       if (!h.safe) {                  // no key yet: the wedgie's own A makes it; look again in a moment
-        noKey = true; paintWedgie();
+        noKey = h.safe_state === "swap" || h.safe_state === "lock" ? h.safe_state : true; paintWedgie();
         await sleep(3000);
         if (present(w)) { wedgie = null; paintWedgie(); }
         return;

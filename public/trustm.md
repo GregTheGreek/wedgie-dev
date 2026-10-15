@@ -78,6 +78,11 @@ Everything on the chip lives in an object with a 2-byte ID (OID). `optiga` names
 | `AES_KEY` | E200 | AES key (V3) | `aes_genkey`, `aes`, `mac` |
 | `UID` `LCSG` `SEC` ... | E0C0-E0C6, F1C0-F1C2 | chip info and state | `read`, `info()` |
 
+**Who uses which slot.** `KEY2` and `DATA[11]` are **Safe Signer's**: the person's key and its public key,
+locked for good once made (below). Never write, re-key or lock them. Your app: `KEY3` or `KEY4`, and any
+other `DATA`. Two slots for every other app: check `c.metadata(KEY3)` isn't locked before you use one, and
+say in your README which you take.
+
 Who can do what to each slot is in its **metadata** (`c.metadata(oid)`). As shipped, the key slots,
 data, counters and certificates are open to everyone (rule: "while its lifecycle is below
 operational"). That means **any program on the wedgie can use or replace a key in KEY2-4**: the

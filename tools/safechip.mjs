@@ -2,7 +2,7 @@
 // and its real heap: tools/rp2040/chip.mjs), the way /safe drives it: hello (its key), then safe_sign for
 // a plain send, an add owner (of itself), a removal, and a MultiSend batch as big as /safe lets through
 // (one USB line just under 6 KB, a page per action, no intro page), A pressed through every page; and one answered Y.
-// The virtual chip has no Trust M, so a yes ends in the app's error answer at the chip step; everything
+// The virtual chip has no secure chip, so a yes ends in the app's error answer at the chip step; everything
 // before it (parsing, the Safe tx hash in pure-Python keccak, the decode, the screens) runs for real.
 // A MemoryError, a traceback, "wedgie broke" or no answer fails it. Prints the least free heap seen.
 //   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>]   (default: the shelf's copy
@@ -27,13 +27,14 @@ if (appDir) {               // a local checkout instead of the shelf's copy: its
 const cart = F.carts.find((c) => c.mod === "safe");
 console.log(`Safe Signer (${appDir || "the shelf's copy"}): ${cart.files.join(" ")}`);
 
-// a key, as the app saves it after making one in the chip (the public half only matters here)
-const key = { x: "0x" + "11".repeat(32), y: "0x" + "22".repeat(32) };
+// a key, as the app saves an ATECC608's (the public half only matters here). A Trust M key lives only in the
+// chip, which this board doesn't have (tools/test_safekey.py checks that path on a fake Trust M).
+const key = { x: "0x" + "11".repeat(32), y: "0x" + "22".repeat(32), chip: "ATECC608" };
 const signer = E.signerAddress(key.x, key.y);
 const KEYS = { A: 15, B: 17, X: 19, Y: 21, up: 2, down: 18, left: 16, right: 20, press: 3 };
 const BAD = /MemoryError|memory allocation failed|wedgie broke/;
-// a traceback that isn't the expected one: the chip step on a board with no Trust M (trustm.py)
-const crash = (out) => BAD.test(out) || out.split("Traceback").slice(1).some((t) => !/OSError: trustm/.test(t.split("\n{")[0]));
+// a traceback that isn't the expected one: the chip step on a board with no chip (trustm.py, or no ATECC608)
+const crash = (out) => BAD.test(out) || out.split("Traceback").slice(1).some((t) => !/OSError: (trustm|the key is in an ATECC608)/.test(t.split("\n{")[0]));
 let all = "", failed = 0, least = Infinity, leastWhere = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
 const h = host({ fs: image(F, "safe", { "saves/safe/key.json": Buffer.from(JSON.stringify(key)) }), onData: (b) => { all += Buffer.from(b).toString("latin1"); } });
@@ -128,8 +129,8 @@ for (const [what, t, pages] of cases) {
   const out = all.slice(before);
   if (!got) console.log("     no answer; it said:", JSON.stringify(out.slice(-800)));
   const r = ram(what);
-  // a yes reaches the chip step: no Trust M here, so the app answers its error (anything but a crash)
-  const chipStep = got?.type === "safe_sig" || /trustm/.test(got?.error || "");
+  // a yes reaches the chip step: no chip here, so the app answers its error (anything but a crash)
+  const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
   check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
 }
 if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_data pieces first, then "@"
@@ -144,7 +145,7 @@ if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_
     }
     const { got, secs } = okp ? ask({ ...tx("0x" + "66".repeat(20), "@"), data: "@" }, "A") : { got: null, secs: 0 };
     const r = ram(`a ${size} B tx in pieces`);
-    const chipStep = got?.type === "safe_sig" || /trustm/.test(got?.error || "");
+    const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
     if (size > (hi.safe_max || 8000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
     check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   }
