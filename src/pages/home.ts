@@ -269,16 +269,22 @@ function library(box: HTMLElement) {
   let items: HTMLElement[] = [];
   let carts: import("../serial/install").Cart[] = [];
   let shown = -1;
-  const update = () => {
-    if (!items.length) return;
-    const r = box.getBoundingClientRect();
-    const p = Math.max(0, Math.min(1, -r.top / Math.max(1, r.height - innerHeight)));
-    const at = p * (items.length - 1);
-    const w = row.clientWidth;
+  // Measured on load/resize, not per scroll. The viewport height is only re-read when the width changes:
+  // a phone's toolbar sliding in and out resizes innerHeight mid-scroll and would jolt the carts.
+  let span = 1, w = 0, vw = 0, vh = innerHeight;
+  let at = 0, goal = 0, raf = 0;
+  const measure = () => {
+    if (innerWidth !== vw) { vw = innerWidth; vh = innerHeight; }
+    span = Math.max(1, box.offsetHeight - vh);
+    w = row.clientWidth;
+  };
+  const place = () => {
     const spine = Math.min(34, w / 22), gap = Math.min(140, w / 4.2);
     items.forEach((el, i) => {
       const d = i - at, s = Math.max(-1, Math.min(1, d));
-      el.style.transform = `translateX(${d * spine + s * gap}px) translateZ(${(1 - Math.abs(s)) * 130}px) rotateY(${-s * 72}deg)`;
+      // perspective() first, around the stage's center (every item sits there), so each cart is its own flat
+      // 3D layer: no preserve-3d scene for the browser to depth-sort every frame; z-index does the stacking.
+      el.style.transform = `perspective(1100px) translate3d(${d * spine + s * gap}px,0,${(1 - Math.abs(s)) * 130}px) rotateY(${-s * 72}deg)`;
       el.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
     });
     const n = Math.round(at);
@@ -286,11 +292,23 @@ function library(box: HTMLElement) {
       shown = n;
       cap.querySelector("h3")!.textContent = carts[n].name;
       cap.querySelector("p")!.textContent = carts[n].about || "";
-      cap.classList.remove("in"); void cap.offsetWidth; cap.classList.add("in");
+      cap.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 300, easing: "ease-out" });
     }
   };
+  // One write per frame, easing toward the scroll position (a mouse wheel jumps; a finger shouldn't lag).
+  const tick = () => {
+    raf = 0;
+    goal = Math.max(0, Math.min(1, -box.getBoundingClientRect().top / span)) * (items.length - 1);
+    at = at < 0 ? goal : at + (goal - at) * 0.4;  // the first frame snaps
+    if (Math.abs(goal - at) < 0.002) at = goal;
+    place();
+    if (at !== goal) raf = requestAnimationFrame(tick);
+  };
+  const update = () => {
+    if (items.length && !raf) raf = requestAnimationFrame(tick);
+  };
   addEventListener("scroll", update, { passive: true });
-  addEventListener("resize", update);
+  addEventListener("resize", () => { measure(); update(); });
   new IntersectionObserver(async (es, o) => {
     if (!es.some((e) => e.isIntersecting)) return;
     o.disconnect();
@@ -301,6 +319,8 @@ function library(box: HTMLElement) {
       box.style.setProperty("--n", String(carts.length));
       row.innerHTML = carts.map((c) => `<div class="lib-item"><a class="cart" href="/code" aria-label="${c.name.replace(/"/g, "&quot;")}">${cartHtml(c)}</a></div>`).join("");
       items = [...row.querySelectorAll<HTMLElement>(".lib-item")];
+      measure();
+      at = -1;
       update();
     } catch (err) { console.error("library:", err); }
   }, { rootMargin: "600px" }).observe(box);
