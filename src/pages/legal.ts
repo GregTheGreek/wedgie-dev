@@ -1,7 +1,7 @@
 // /terms and /privacy: who sells a wedgie and on what terms. Linked from the footer and the order page's
-// pay box. The seller is BuidlGuidl LLC (Stripe's support address). Plain words; the caps parts are caps
+// pay box. The seller is BuidlGuidl DAO LLC (Stripe's support address). Plain words; the caps parts are caps
 // on purpose (a warranty disclaimer has to stand out).
-export const SELLER = "BuidlGuidl LLC";
+export const SELLER = "BuidlGuidl DAO LLC";
 const ADDR = "3307 S College Ave Unit 104, Fort Collins, CO 80525";
 const MAIL = "wedgie@buidlguidl.com";
 const UPDATED = "October 15, 2026";
@@ -9,7 +9,7 @@ const UPDATED = "October 15, 2026";
 const TERMS = `
 <h1>Terms of Sale</h1>
 <p class="fine">Updated ${UPDATED}</p>
-<p>wedgie.dev sells wedgies and wedgie kits. The seller is <b>${SELLER}</b>, ${ADDR} ("we"). Paying for an order means you agree to these terms.</p>
+<p>wedgie.dev sells wedgies and wedgie kits. The seller is <b>${SELLER}</b> (a Wyoming LLC), ${ADDR} ("we"). Paying for an order means you agree to these terms.</p>
 
 <h2>What you're buying</h2>
 <p>A wedgie is a hobby computer made from off-the-shelf parts. The design, case, firmware, and this site are open source (MIT). A kit is the parts plus the instructions, for you to put together.</p>
