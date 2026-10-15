@@ -61,7 +61,7 @@ const STEPS: Step[] = [
     d: "09", ph: ["09-header-ready"] },
   { t: "Plug in the chip",
     p: `The cable's plug now hangs off the screen board. Plug it into the Trust M (it only fits one way). Tuck the Trust M in on the back of the screen board, at an angle between the two socket rows, off the pins. The Pico goes on top of it next.`,
-    d: "10b", ph: ["02-trust-m-plug", "10-chip-wedged"] },
+    d: "10c", ph: ["02-trust-m-plug", "10-chip-wedged"] },
   { t: "Stack the boards",
     p: `Push the Pico into the sockets, <b>USB-C at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
     d: "10", ph: ["10-stacked-top", "10-chip-wedged", "10-headers-flush"],
