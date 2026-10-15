@@ -67,7 +67,8 @@ know we trust. And what if someone flashes the firmware with their own version?"
 - **PIN checked by the chip.** Trust M V3 can refuse to use a key until it's given an auth value;
   derive it from a PIN typed on the wedgie. A stolen wedgie with fake firmware still can't sign.
   (It doesn't stop swap-and-give-back: the owner types the PIN into the fake.) To research: does
-  our Trust M version support it, and does it limit wrong guesses.
+  our Trust M version support it, and does it limit wrong guesses. Ours is V1 (no PIN feature);
+  the V1 workaround is in `docs/PLAN-PIN.md`.
 - **Apps on a money wedgie:** only shelf apps, each reviewed for what it does with the chip. Keep
   a short review checklist in `docs/APPS.md`.
 
