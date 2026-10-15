@@ -3,7 +3,7 @@
 // clawd-pico-case/assembly/ASSEMBLY.md. Drawings and photos: public/img/assemble/ (tools/asmimg.py).
 import "./assemble.css";
 
-type Step = { t: string; p: string; d: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
+type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
 // The screen board's sockets seen from above (board face down, USB end up): the top 8 holes of each
 // row. The four the chip uses are filled with their wire's color; the 4th on the right is struck out.
@@ -35,14 +35,14 @@ const STEPS: Step[] = [
     p: `The 4-wire cable (white, yellow, black, red) with its small plug, wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "How the plug fits the chip",
-    p: `The plug goes into the Trust M chip board. This is just to show the fit: you plug it in for real at step 10. Wire order across the plug: <b>white, yellow, black, red</b>.`,
-    d: "02", ph: ["02-cable-into-trust-m"] },
+    p: `The plug goes into the Trust M chip board. This is just to show the fit: you plug it in for real at step 10. Only 4 wires. Top to bottom: <b>white, yellow, black, red</b>.`,
+    d: "02", ph: ["02-trust-m-plug"] },
   { t: "Cut and strip the wires",
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
     d: "03", ph: ["03-cut-and-stripped-a", "03-cut-and-stripped-b"] },
   { t: "Lay out the screen board",
     p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
-    d: "04", ph: ["04-board-and-wiring-guide"], art: HEADER,
+    d: "04", ph: ["04-board-and-guide"], art: HEADER,
     warn: `Never put anything in the 4th socket on the right row.` },
   { t: "Push in white and yellow",
     p: `Twist the strands at each tip tight, so each acts like one solid wire. Push <b>white into the 3rd</b> and <b>yellow into the 5th</b> socket on the right row.`,
@@ -52,15 +52,18 @@ const STEPS: Step[] = [
     d: "06", ph: ["06-tape-over-wires"] },
   { t: "Poke the holes open",
     p: `Push the stiff jumper wire through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
-    d: "07", ph: ["07-poke-holes-through-tape"] },
+    ph: ["08-black-red-taped", "07-poke-holes-through-tape"] },
   { t: "Black and red, same way",
     p: `On the left row: <b>black into the 6th</b>, <b>red into the 7th</b>. Tape over them. Poke the holes open.`,
     d: "08", ph: ["08-black-red-guide", "08-black-red-in-header", "08-black-red-taped"] },
   { t: "Header ready",
     p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
     d: "09", ph: ["09-header-ready"] },
+  { t: "Plug in the chip",
+    p: `The cable's plug now hangs off the screen board. Plug it into the Trust M (it only fits one way). Tuck the Trust M in on the back of the screen board, at an angle between the two socket rows, off the pins. The Pico goes on top of it next.`,
+    ph: ["10-chip-wedged"] },
   { t: "Stack the boards",
-    p: `Plug the cable into the Trust M. Lay the Trust M at an angle on the back of the screen board. Push the Pico into the sockets, <b>USB-C at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
+    p: `Push the Pico into the sockets, <b>USB-C at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
     d: "10", ph: ["10-stacked-top", "10-chip-wedged", "10-headers-flush"],
     warn: `No pin, wire or chip sticking out. If anything does, do it again: it won't fit the case.` },
   { t: "Test the boards",
@@ -70,7 +73,7 @@ const STEPS: Step[] = [
     warn: `Chip fails? A wire is in the wrong socket, a wire came out, or the Trust M touches a Pico pin. Take it apart and check.` },
   { t: "Pick the base",
     p: `The base color says what's inside: <b>red</b> is a Pico W with a battery, <b>black</b> is the Trust M chip, <b>gray</b> is the ATECC608. This build is Trust M, so black.`,
-    d: "12", ph: ["12-bases"] },
+    d: "12", ph: ["13-bases"] },
   { t: "Peel the screen protector",
     p: `Pull the blue tab off the screen.`,
     d: "13", ph: ["13-screen-protector"] },
@@ -124,7 +127,7 @@ export function assemble(main: HTMLElement) {
           ${s.end || ""}
         </div>
         <figure class="draw">
-          <img src="${IMG}d${s.d}.webp" alt="Step ${i + 1}: ${s.t}" loading="lazy">
+          <img src="${s.d ? `${IMG}d${s.d}.webp` : `${IMG}p/${s.ph[0]}.webp`}" alt="Step ${i + 1}: ${s.t}" loading="lazy">
           <figcaption class="photos">${s.ph.map((f) => `<button type="button" data-ph="${f}" aria-label="Photo"><img src="${IMG}t/${f}.webp" alt="" loading="lazy"></button>`).join("")}</figcaption>
         </figure>
       </li>`).join("")}
