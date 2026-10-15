@@ -1,0 +1,30 @@
+{
+  "apps": [
+    {
+      "mod": "tank",
+      "name": "Loogie Tank",
+      "about": "The loogies your Safe owns, swimming. Joystick picks one.",
+      "files": [
+        "tank/tank.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "label": "#8fb9eb",
+      "icon": [
+        "bbbbbbbbbbbb",
+        "bbbbbbbbbbbb",
+        "bbkkbkkbbbbb",
+        "bkwwkwwkbbwb",
+        "bkwkkwkkbbbb",
+        "bbkkgkkkbbbb",
+        "bkggggggkbwb",
+        "bkggggggkbbb",
+        "bkkggggkkbbb",
+        "bbbkkkkbbbbb",
+        "yyyyyyyyyyyy",
+        "yyyyyyyyyyyy"
+      ],
+      "usb": true
+    }
+  ]
+}
