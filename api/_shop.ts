@@ -49,6 +49,8 @@ export async function db() {
     await sql`create index if not exists links_email on links (email_hash, created)`;
     await sql`create table if not exists sessions (   -- a signed-in browser (api/login.ts)
       token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
+    await sql`alter table links add column if not exists email_enc text`;      // the email, locked (_mail.ts lock)
+    await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;

@@ -63,8 +63,10 @@ const nl = mails().filter((m) => m.to === "nobody@example.com").pop()?.text.matc
 const ns = await call(login.POST, { link: nl });
 ok(ns.session && ns.orders.length === 0, "no orders: the link signs in, no orders");
 const old = await call(order.POST, { ...base, email: "other@example.com" });
-await sql`update orders set email_hash = null where id = ${old.id}`;
-ok((await call(login.POST, { session: ns.session, claim: [{ id: old.id, token: old.token }] })).orders?.[0]?.id === old.id, "signed in: this device's old order (no email) joins the account");
+await sql`update orders set email_hash = null, email_enc = null where id = ${old.id}`;
+const cl = await call(login.POST, { session: ns.session, claim: [{ id: old.id, token: old.token }] });
+const [oc] = await sql`select email_enc from orders where id = ${old.id}`;
+ok(cl.email === "nobody@example.com" && cl.orders?.[0]?.id === old.id && oc.email_enc, "signed in: this device's old order (no email) gets the email");
 ok((await call(login.POST, { session: ns.session, claim: [{ id: o.id, token: "0".repeat(32) }] })).orders.length === 1, "a wrong token claims nothing");
 
 // 5
@@ -111,6 +113,13 @@ await A.waitForURL(/\/orders$/, { timeout: 5000 });
 ok(await A.locator(`[data-id="${o2.id}"]`).count() === 1 && await A.locator(".orders-btn .lbl").innerText() === "Orders", "tab A signed in by itself; the header says Orders");
 await A.goto(SITE + "/signin");
 ok(await A.inputValue("[name=email]").catch(() => null) === null && /\/orders$/.test(A.url()), "signed in, /signin goes to your orders");
+await A.evaluate(() => localStorage.removeItem("wedgie-email"));
+await A.goto(SITE + "/orders");
+await A.getByText("Signed in as").waitFor();
+await A.goto(SITE + "/order");
+const em = A.locator("#o-addr [name=email]");
+ok(await em.inputValue() === "tabs@example.com" && await em.getAttribute("readonly") !== null, "signed in: checkout has your email, locked");
+await A.goto(SITE + "/orders");
 await A.locator("#o-out").click();
 await A.waitForURL(SITE + "/");
 ok(await A.evaluate(() => ["wedgie-session", "wedgie-orders", "wedgie-email"].every((k) => !localStorage.getItem(k))), "Sign out forgets everything here");

@@ -70,6 +70,7 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     box.innerHTML = `<div class="safe-box recess"><p class="fine">Signing in.</p></div>`;
     login({ link }).then((r) => {
       keep(r.orders);
+      localStorage.setItem(LAST, r.email);
       localStorage.setItem(SESSION, JSON.stringify({ token: r.session, until: r.until }));
       location.replace("/orders");
     }, (e) => { say(msgOf(e), true); ask(); });
@@ -116,7 +117,7 @@ async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const s = session();
   if (s) {
     const claim = Object.entries(mem()).map(([id, o]) => ({ id, token: o.token }));
-    try { keep((await login({ session: s.token, claim })).orders); }
+    try { const r = await login({ session: s.token, claim }); keep(r.orders); localStorage.setItem(LAST, r.email); }
     catch (e) { if (/Signed out/.test(msgOf(e))) { localStorage.removeItem(SESSION); return location.reload(); } say(msgOf(e), true); }
   }
   const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
@@ -170,7 +171,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
         <label>State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
         <label>ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
-        <label class="wide">Email <span class="fine">(for the tracking number; never shared)</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"></label>
+        <label class="wide">Email <span class="fine">${session() ? "(signed in)" : "(for the tracking number; never shared)"}</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"${session() && lastEmail() ? " readonly" : ""}></label>
       </form>
     </div>
     <div class="safe-box recess" id="o-pay">

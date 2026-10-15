@@ -740,3 +740,4 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
   border: 2px solid var(--mint); background: #f3fbf5; opacity: calc(.15 + var(--s3) * .85); filter: grayscale(calc(1 - var(--s3))); }   /* a status, not a button */
 @media (max-width: 860px) { .signer { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .stx { --p: 1 !important; } }
+.order-fields input[readonly] { opacity: .6; cursor: default; }

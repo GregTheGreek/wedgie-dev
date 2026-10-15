@@ -1,13 +1,14 @@
 // /api/login: sign in by email to see your orders on any device.
 //   POST {email}       a sign-in link (/signin#<token>) goes to that email
-//   POST {link}        the link's token -> {session, until, orders}. Works once, 15 minutes.
-//   POST {session}     -> {until, orders}; 401 once it's over (SESSION_DAYS) or signed out.
-//                      + claim: [{id, token}] (this device's orders): ones with no email yet join this email
+//   POST {link}        the link's token -> {session, until, email, orders}. Works once, 15 minutes.
+//   POST {session}     -> {until, email, orders}; 401 once it's over (SESSION_DAYS) or signed out.
+//                      + claim: [{id, token}] (this device's orders): ones with no email get this one (for login, and
+//                      the paid/shipped mails if it hasn't shipped)
 //   POST {signout}     the session ends
 // orders: [{id, token, at}]; the tokens (_mail.ts tokenOf) open each order's page. One link a minute, 5 an hour,
 // per email. Only hashes are stored.
 import { db, json, oops, same, env, sha256, randomHex } from "./_shop.js";
-import { EMAIL, emailHash, tokenOf, signinMail } from "./_mail.js";
+import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock } from "./_mail.js";
 
 const SESSION_DAYS = 30;
 type Sql = Awaited<ReturnType<typeof db>>;
@@ -33,28 +34,30 @@ async function ask(sql: Sql, email: string, origin: string) {
   if (r.minute) return oops("We just sent one. Wait a minute.", 429);
   if (r.hour >= 5) return oops("Too many tries. Wait an hour.", 429);
   const token = randomHex(16);
-  await sql`insert into links (token_hash, email_hash) values (${await sha256(token)}, ${h})`;
+  await sql`insert into links (token_hash, email_hash, email_enc) values (${await sha256(token)}, ${h}, ${await lock(email.trim())})`;
   try { await signinMail(email.trim(), `${origin}/signin#${token}`); } catch { return oops("Couldn't send the email. Try again soon.", 503); }
   return json({ ok: true });
 }
 
 async function follow(sql: Sql, link: string) {
   const [l] = await sql`update links set used_at = now() where token_hash = ${await sha256(link)} and used_at is null
-    and created > now() - interval '15 minutes' returning email_hash`;
+    and created > now() - interval '15 minutes' returning email_hash, email_enc`;
   if (!l) return oops("That link ran out. Sign in again.");
   await sql`delete from sessions where expires < now()`;
   const session = randomHex(16);
-  const [s] = await sql`insert into sessions (token_hash, email_hash, expires) values (${await sha256(session)}, ${l.email_hash},
-    now() + ${`${SESSION_DAYS} days`}::interval) returning expires`;
-  return json({ session, until: new Date(s.expires).getTime(), orders: await orders(sql, l.email_hash) });
+  const [s] = await sql`insert into sessions (token_hash, email_hash, email_enc, expires) values (${await sha256(session)}, ${l.email_hash},
+    ${l.email_enc}, now() + ${`${SESSION_DAYS} days`}::interval) returning expires`;
+  return json({ session, until: new Date(s.expires).getTime(), email: await unlock(l.email_enc), orders: await orders(sql, l.email_hash) });
 }
 
 async function mine(sql: Sql, session: string, claim: any[]) {
-  const [s] = await sql`select email_hash, expires from sessions where token_hash = ${await sha256(session)} and expires > now()`;
-  if (!s) return oops("Signed out.", 401);
+  const [s] = await sql`select email_hash, email_enc, expires from sessions where token_hash = ${await sha256(session)} and expires > now()`;
+  if (!s || !s.email_enc) return oops("Signed out.", 401);
   for (const c of claim) if (typeof c?.id === "string" && typeof c?.token === "string")
-    await sql`update orders set email_hash = ${s.email_hash} where id = ${c.id} and token_hash = ${await sha256(c.token)} and email_hash is null`;
-  return json({ until: new Date(s.expires).getTime(), orders: await orders(sql, s.email_hash) });
+    await sql`update orders set email_hash = ${s.email_hash},
+      email_enc = case when status in ('new', 'paid') then ${s.email_enc} else email_enc end
+      where id = ${c.id} and token_hash = ${await sha256(c.token)} and email_hash is null`;
+  return json({ until: new Date(s.expires).getTime(), email: await unlock(s.email_enc), orders: await orders(sql, s.email_hash) });
 }
 
 async function orders(sql: Sql, h: string) {
