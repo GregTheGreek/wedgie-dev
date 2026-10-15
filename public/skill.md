@@ -1,6 +1,6 @@
 ---
 name: wedgie
-description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, a secure chip on I2C, running MicroPython + wedgie firmware) - talking to it directly over USB (find its port, hello, its screen, buttons, files, the lock and the green-button press, full control), wedgie.py, building one from parts, first boot, finding what's wrong and fixing it, firmware and apps. Use for "my wedgie is plugged in", "what's on my wedgie's screen", "update my wedgie", "build a wedgie", "my wedgie is broken / won't ...", "make an app for my wedgie" (then code.md), "use the secure chip" (then trustm.md).
+description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, a secure chip on I2C, running MicroPython + wedgie firmware) - talking to it directly over USB (find its port, hello, its screen, buttons, files, the lock and the green-button press, full control), wedgie.py, building one from parts, first boot, finding what's wrong and fixing it, firmware and apps. Use for "my wedgie is plugged in", "what's on my wedgie's screen", "update my wedgie", "build a wedgie", "my wedgie is broken / won't ...", "I just got a wedgie", "is my wedgie safe", "Safe Signer / my Safe key", "make an app for my wedgie" (then code.md), "use the secure chip" (then trustm.md).
 ---
 
 # Wedgie
@@ -22,6 +22,47 @@ protocol. Everything is MIT: https://wedgie.dev
   https://wedgie.dev/trustm.md
 
 A plugged-in wedgie carries all three in one file, **SKILL.md**, on its WEDGIE drive.
+
+## Just got one? Start here
+
+1. Plug it in. The WEDGIE drive appears. Double-click **Open wedgie** (Mac) or **Open wedgie (Windows)**,
+   or go to https://wedgie.dev/connect in Chrome or Edge (Safari and Firefox can't talk to USB).
+2. Tap **Connect** and pick the wedgie. If the page says the firmware is old, update it.
+3. Pick an app from the shelf. The wedgie asks "Install ...?" on its screen: press the green button.
+4. For a Safe signer: install **Safe Signer**, then go to https://wedgie.dev/safe ("Safe Signer" below).
+
+A new wedgie says "no software" until an app is picked. That's normal.
+
+## Is it safe?
+
+- **Plugging it in gives a computer nothing.** It's locked: no computer can reach its code, its files
+  (except `/saves/`) or its secure chip without a press of the green button on the wedgie itself.
+- **It signs nothing without that press.** No USB message, website or app on your computer can press it.
+- **Firmware and shelf apps are signed by wedgie.dev.** The wedgie checks the signature before it installs.
+- **Keys are made inside the secure chip and never leave it.** Not to the computer, not to wedgie.dev.
+- **Limits, honestly:** an app runs with full power on the wedgie, so install only shelf apps or repos you
+  trust (a repo added by hand is not signed). If someone has the wedgie in hand, they can press its buttons.
+  A lost or broken chip takes its keys with it: keep a Safe's other owners or recovery in place.
+- Everything is open source (MIT): https://github.com/clawdbotatg/wedgie-dev
+
+## Safe Signer
+
+Makes the wedgie an owner of a Safe{Wallet} (Base, Ethereum, Optimism, Arbitrum, and their testnets).
+App: `clawdbotatg/wedgie-safe`, on the shelf. Page: https://wedgie.dev/safe.
+
+- **The key is made by you, on the wedgie.** The first time Safe Signer opens it shows **No key** and
+  "make a key". Press green, then yes: the secure chip makes a new random key inside itself. Nobody has
+  ever seen it, including wedgie.dev. (On an ATECC608 chip the first key also locks the chip's settings
+  for good; the question says so.)
+- **Check it's yours.** If Safe Signer shows an address the very first time you open it, a key was made
+  before you got it. Don't use it: make a new one (below).
+- **A new key:** delete `/saves/safe` (`{"type":"rm","path":"/saves/safe"}`, no press needed), unplug,
+  plug back in, open Safe Signer, press green. The old key is replaced in the chip for good: remove it
+  from any Safe first.
+- **Signing:** the page sends the transaction, the wedgie works out the hash itself, shows what it does,
+  and signs only on green. Red says no.
+- On chain the key is a passkey-style owner (P-256, Safe's WebAuthn signer). The wedgie shows its owner
+  address; wedgie.dev/safe works it out too and refuses if the two differ.
 
 ## Talk to it directly
 
@@ -339,7 +380,7 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
 - 3.3 V logic everywhere; GPIOs are **not 5 V tolerant**. Power comes from USB (5 V on VBUS); the
   Pico's 3V3 pin can supply a few hundred mA for add-ons.
 - RP2040: 264 KB RAM, 2 MB flash. RP2350 (Pico 2 W): 520 KB RAM, 4 MB flash. The screen buffer takes
-  29 KB (16 colors, 0.3.24+; it was 115 KB). Free RAM for an app on an RP2040: about 130-150 KB
+  29 KB (16 colors, 0.3.24+; it was 115 KB). Free RAM for an app on an RP2040: about 120-150 KB
   (`hello`'s `ram` says); an RP2350 has several times that.
 - 240x240; the panel is 16-bit color, the firmware draws in 16 colors (the boot logo in full color); a full-screen push takes ~25 ms (code.md has the measured costs).
 - No battery built in. A LiPo on VSYS (the atomic wedgie) works: off USB, the firmware (0.3.28+,
@@ -395,8 +436,8 @@ another takes the old one's files off and puts the new one's on; saves stay. A f
 nothing and says "no software" until one is picked.
 
 Apps live in their own GitHub repos, each with a `wedgie.json` (code.md). **The shelf** at
-wedgie.dev/connect lists the ones wedgie.dev has read and signed (today: Buttons,
-`clawdbotatg/wedgie-buttons`); they install with a signed install. **Any other repo** can be added on a
+wedgie.dev/connect lists the ones wedgie.dev has read and signed (Safe Signer, Buttons, Keypad, Frog,
+Grove, Bunker, Blocks, 2048, Blackjack: `clawdbotatg/wedgie-*`); they install with a signed install. **Any other repo** can be added on a
 wedgie's page (Software, "Apps from a GitHub repo"): it isn't signed, so it installs with full access,
 and **an app installed that way can do anything a computer with full control can, including replacing
 the keys in the Trust M's spare key slots.** Only install repos you trust.
