@@ -11,6 +11,7 @@ e8f645382cc4d21e5d58168101e7f3891cd0f3921c26205e153393ff78f5c309  bunker_art.mpy
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
 ac84879318779b901f144fed98422ee9d59e77bbbbb8e925edc075221d1a2445  drive.bin
 cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
+73267cc4d9bcc4cd5bd31117476f67ee7817db055e39274c5636df5a563169c0  g2048.py
 f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 2cec32b1db4f308ae0457f380ef97cfd033df0a5369cb1a727d0dff26b872ca4  hatch.mpy
 a853621f0087dd9b513c40c674cc5ed7d5b95ae3b314cbac65fbc15d1473d7e2  inbox.mpy
@@ -42,6 +43,7 @@ f002daddfb6579173e402cbfe20fe767940ddb7754994ef4a86ada6abee206be  wedgie.mpy
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
+@app  {"mod":"g2048","name":"2048","entry":"run","files":["g2048.py"]}
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py"]}

@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "g2048",
+      "name": "2048",
+      "about": "Slide the tiles. Two the same become one. Reach 2048.",
+      "files": [
+        "g2048.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "label": "#edc22e",
+      "icon": [
+        "............",
+        ".kkkkkkkkkk.",
+        ".kwwkyykssk.",
+        ".kwwkyykssk.",
+        ".kkkkkkkkkk.",
+        ".kyykrrkwwk.",
+        ".kyykrrkwwk.",
+        ".kkkkkkkkkk.",
+        ".ksskwwkyyk.",
+        ".ksskwwkyyk.",
+        ".kkkkkkkkkk.",
+        "............"
+      ]
+    }
+  ]
+}
