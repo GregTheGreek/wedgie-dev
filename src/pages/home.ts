@@ -80,7 +80,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card wide signer">
       <div class="signer-copy">
         <span class="kicker">Safe signer</span>
-        <h2>Sign on a Gnosis Safe.</h2>
+        <h2>Sign on a Safe.</h2>
         <p>A wedgie can sign for a Safe multisig with Safe's own audited contracts. The key never leaves the chip, and nothing signs until you press the green button.</p>
         <div class="row"><a class="btn btn-sm" href="/safe">Use it with a Safe →</a></div>
       </div>
