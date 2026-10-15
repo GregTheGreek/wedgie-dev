@@ -49,7 +49,7 @@ const STEPS: Step[] = [
     d: "06", ph: ["06-tape-over-wires"] },
   { t: "Poke the holes open",
     p: `Push the stiff jumper wire through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
-    d: "06p", ph: ["08-black-red-taped", "07-poke-holes-through-tape"] },
+    d: "06t", ph: ["08-black-red-taped", "07-poke-holes-through-tape"] },
   { t: "Black and red, same way",
     p: `On the left row: <b>black into the 6th</b>, <b>red into the 7th</b>. Tape over them. Poke the holes open.`,
     d: "08", ph: ["08-black-red-guide", "08-black-red-in-header", "08-black-red-taped"] },
