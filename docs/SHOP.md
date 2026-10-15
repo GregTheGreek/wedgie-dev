@@ -39,6 +39,11 @@ The addresses are CREATE2 (`src/shop/deposits.ts`), so nothing is deployed per o
 `contracts/src/WedgieDeposits.sol`. Factory **`0x555B4c148102e6acA47edBD26e54Eb0FBfdB5C67`**, the same on
 Base, Ethereum, Arbitrum and Optimism (deterministic deployer, salt 0). Its `shop` is wedgie.eth
 (`0xf5d3C7F2fACeAAc12A75d66e3BE4365A21d0d43C`).
+Source verified on all four explorers ([Basescan](https://basescan.org/address/0x555B4c148102e6acA47edBD26e54Eb0FBfdB5C67#code)).
+Not audited by a person; an AI audit: https://www.onedollaraudit.com/audit/1012
+
+**When to sweep:** when an order is boxed and shipped, not before. Until then its money waits at its own
+address, so a refund (rare) is wedgie.eth calling `exec` to send it back from there.
 
 - Sweep on each chain the money is on.
 - `sweep(salt, token)`: deploys the order's Deposit if needed and sends all of that token to wedgie.eth.
