@@ -282,7 +282,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       h += got ? `<p class="order-pay-now">Got ${usdc(got.toString())}. Send <b>${usdc(owe.toString())} USDC</b> more on ${esc(c.name)}</p>
         <p class="fine">To the same address. <button class="btn btn-sm" data-copy="${usdc(owe.toString())}">Copy amount</button></p>`
         : `<p class="order-pay-now">Send <b>${usdc(v.usdc!)} USDC</b> on ${esc(c.name)} in <b class="o-left"></b></p>
-        <p class="fine">${got == null ? "The exact amount: its last digits tell us it's you." : "This address is only for this order, and goes to wedgie.eth. Short? Send the rest."} <button class="btn btn-sm" data-copy="${usdc(v.usdc!)}">Copy amount</button></p>`;
+        <p class="fine">${got == null ? "The exact amount: its last digits tell us it's you." : "This address is only for this order, and goes to wedgie.eth. Short? Send the rest. Base, Ethereum, Arbitrum and Optimism all count."} <button class="btn btn-sm" data-copy="${usdc(v.usdc!)}">Copy amount</button></p>`;
       h += `
         <div class="order-to"><span class="fine">to</span> ${named ? `<b class="order-ens">${SHOP_ENS.name}</b>` : ""}
           <code class="safe-addr">${esc(v.payTo || "")}</code>
