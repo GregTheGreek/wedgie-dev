@@ -4,13 +4,11 @@ import { ITEMS, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
 import { blo } from "blo";
 
-const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 // The Safe section's drawing: Safe's mark (from safe-global/safe-wallet-monorepo), two made-up owners, a key that turns into a wedgie.
 const SAFE_MARK = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M21.757 11.998h-2.485c-.742 0-1.343.579-1.343 1.293v3.47c0 .714-.602 1.293-1.344 1.293H6.699c-.743 0-1.344.578-1.344 1.292v2.391c0 .714.601 1.293 1.344 1.293h10.458c.742 0 1.335-.579 1.335-1.293V19.82c0-.714.602-1.22 1.344-1.22h1.92c.743 0 1.344-.58 1.344-1.293v-4.03c0-.714-.601-1.278-1.343-1.278ZM5.355 7.249c0-.714.6-1.293 1.343-1.293h9.88c.743 0 1.344-.579 1.344-1.293v-2.39c0-.714-.601-1.293-1.344-1.293H6.125c-.742 0-1.343.579-1.343 1.293v1.842c0 .714-.602 1.292-1.344 1.292H1.526C.784 5.407.182 5.986.182 6.7v4.034c0 .714.604 1.264 1.346 1.264h2.485c.743 0 1.344-.579 1.344-1.293L5.355 7.25ZM10.472 9.485h2.387c.778 0 1.409.608 1.409 1.356v2.296c0 .748-.632 1.356-1.41 1.356h-2.386c-.778 0-1.409-.608-1.409-1.356v-2.296c0-.749.632-1.356 1.409-1.356Z"/></svg>`;
 const OWNERS = ["0x3f6a1d2c8b4e7f90a1b2c3d4e5f60718293a4b5c", "", "0x9c41e07b5d2a8f3e6c1b0a9d8e7f6a5b4c3d2e1f"] as const;
 const KEY_SVG = `<svg class="stx-key" viewBox="0 0 40 40"><circle cx="13" cy="20" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M20 20h15v6M30 20v5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>`;
 const WEDGIE_SVG = `<svg class="stx-wedgie" viewBox="-64 -28 128 56"><rect x="-62" y="-26" width="124" height="52" rx="14" fill="#2a2b2a"/><rect x="-60" y="-26" width="120" height="48" rx="13" fill="#fefefe" stroke="#d6d6d1"/><rect x="-22" y="-20" width="44" height="36" rx="3" fill="#1a1b1a"/><rect x="-19" y="-17" width="38" height="30" fill="#fefefe"/><rect x="-19" y="-17" width="38" height="2.5" fill="#22c452"/><rect x="-19" y="-14.5" width="38" height="2" fill="#a9aaab"/><rect x="-19" y="-12.5" width="38" height="2.5" fill="#e3312c"/><path class="stx-check" pathLength="1" d="M-8 1 L-2 7 L9 -5" fill="none" stroke="#22c452" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="-41" cy="-2" r="8" fill="#a9aaab"/><circle cx="-41" cy="-2" r="5" fill="#8a8b8c"/><circle cx="35" cy="-10" r="4.2" fill="#a9aaab"/><circle cx="35" cy="6" r="4.2" fill="#a9aaab"/><circle cx="47" cy="-10" r="4.2" fill="#22c452"/><circle cx="47" cy="6" r="4.2" fill="#e3312c"/></svg>`;
-const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
 
 /** Returns once the hero wedgie is up (the loader waits for it). */
 export function home(main: HTMLElement): Promise<unknown> {
@@ -63,14 +61,8 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div>
         <h3>Print the case</h3>
         <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
-        <div class="row">
-          <a class="btn btn-sm" href="${CASE}lid.stl" download>Lid · 1 white</a>
-          <a class="btn btn-sm" href="${CASE}base.stl" download>Base · 1 black</a>
-          <a class="btn btn-sm" href="${CASE}joystick.stl" download>Joystick · 1 grey</a>
-          <a class="btn btn-sm" href="${CASE}button.stl" download>Button · 4: 2 grey, 1 green, 1 red</a>
-        </div>
-        <p class="fine">Buttons: hold it sideways, screen facing you, joystick left. Green top right, red bottom right, grey between. All one color? <a href="${CASE}full-set.stl" download>Full set</a>, one plate.</p>
-        <p class="fine"><b>Atomic wedgie</b> (Waveshare RP2040-Plus with a battery): print a red <a href="${ATOMIC}base.stl" download>Atomic base</a> instead of the black base, plus one black <a href="${ATOMIC}aw-reset-plunger.stl" download>RESET plunger</a>.</p>
+        <div class="row"><a class="btn btn-sm btn-green" href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/current" target="_blank" rel="noopener">The case files →</a></div>
+        <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
