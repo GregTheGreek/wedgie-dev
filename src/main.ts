@@ -14,7 +14,7 @@ import { code } from "./pages/code";
 import { debug } from "./pages/debug";
 import { safe } from "./pages/safe";
 import { secret } from "./pages/secret";
-import { order } from "./pages/order";
+import { order, mem as orders } from "./pages/order";
 
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
@@ -27,12 +27,14 @@ const onCode = path === "/code";
 const onDebug = path === "/debug";
 const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or one Safe (/safe/<chain>:<address>)
 const onSecret = path === "/secret";
-const onOrder = path === "/order" || path.startsWith("/order/");   // buy, or one order's status (/order/<id>)
+const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders";   // buy, one order's status (/order/<id>), or all of this browser's
+const nOrders = Object.keys(orders()).length;
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
 <header class="top">
   <a class="brand" href="/"><img src="/img/sticker.webp" alt="" width="46" height="35"><span class="tag">wedgie.dev</span></a>
+  ${nOrders ? `<a class="orders-btn${path === "/orders" ? " here" : ""}" href="/orders" aria-label="Your orders"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z M3 7.5 12 12l9-4.5 M12 12v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Orders</span>${nOrders > 1 ? `<b class="n">${nOrders}</b>` : ""}</a>` : ""}
   <a class="connect-btn${onConnect ? " here" : ""}" id="connect-btn" href="/connect"><span class="led"></span><span class="lbl">Connect</span><b class="n"></b></a>
 </header>
 <main id="top"></main>

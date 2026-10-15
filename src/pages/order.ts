@@ -1,4 +1,5 @@
-// wedgie.dev/order: buy wedgies. /order/<id>: one order's status (paid, shipped, tracking).
+// wedgie.dev/order: buy wedgies. /order/<id>: one order's status (paid, shipped, tracking). /orders: every order
+// this browser made (the header's Orders button, main.ts, shows once there is one).
 // The address is sealed in this browser before it's sent (shop/seal.ts): our server, Stripe and the chain
 // never see it. Card = Stripe Checkout (payment only). USDC = a transfer on Base (a QR code for any phone
 // wallet, or this browser's wallet) for an amount whose last digits (under a cent) name the order; the server
@@ -20,10 +21,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const msgOf = (e: any) => e?.message || String(e);
 const eth = () => (window as any).ethereum;
 
-// This browser's orders: id -> token, and a USDC payment's transaction hash until it's checked.
+// This browser's orders: id -> token, when it was made, and a USDC payment's transaction hash until it's checked.
 const MEM = "wedgie-orders";
-type Mem = Record<string, { token: string; tx?: string }>;
-const mem = (): Mem => { try { return JSON.parse(localStorage.getItem(MEM) || "{}"); } catch { return {}; } };
+type Mem = Record<string, { token: string; at?: number; tx?: string }>;
+export const mem = (): Mem => { try { return JSON.parse(localStorage.getItem(MEM) || "{}"); } catch { return {}; } };
 const remember = (id: string, v: Partial<Mem[string]>) => { const m = mem(); m[id] = { ...m[id], ...v } as Mem[string]; localStorage.setItem(MEM, JSON.stringify(m)); };
 
 async function api(body?: unknown) {
@@ -34,18 +35,35 @@ async function api(body?: unknown) {
 }
 
 export function order(main: HTMLElement) {
-  const id = /^\/order\/([0-9a-f]{12})$/.exec(location.pathname.replace(/\/+$/, ""))?.[1];
+  const path = location.pathname.replace(/\/+$/, "");
+  const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders";
   main.innerHTML = `
   <section class="test-page safe-page order-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>${id ? "Your order" : "Order"}</h1>
+    <h1>${all ? "Your orders" : id ? "Your order" : "Order"}</h1>
     <div id="o-body" class="order-stack"></div>
     <p class="safe-msg" id="o-msg" hidden></p>
   </section>`;
   const body = main.querySelector<HTMLElement>("#o-body")!;
   const msgEl = main.querySelector<HTMLElement>("#o-msg")!;
   const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); };
-  if (id) status(id, body, say); else form(body, say);
+  if (all) list(body); else if (id) status(id, body, say); else form(body, say);
+}
+
+// ---- every order this browser made, newest first ----
+const STATUS: Record<string, string> = { new: "Not paid", expired: "Time ran out", paid: "Paid", shipped: "Shipped", canceled: "Canceled" };
+function list(box: HTMLElement) {
+  const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+  if (!yours.length) { box.innerHTML = `<div class="safe-box recess"><p>No orders in this browser.</p><p><a class="btn btn-green" href="/order">Order a wedgie</a></p></div>`; return; }
+  box.innerHTML = yours.map(([i]) => `<a class="safe-box recess orders-row" href="/order/${esc(i)}" data-id="${esc(i)}">
+    <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("");
+  yours.forEach(([i, o]) => api({ id: i, token: o.token }).then((v: View) => {
+    const row = box.querySelector<HTMLElement>(`[data-id="${i}"]`)!;
+    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ") : "";
+    row.querySelector(".o-what")!.textContent = `${items} · ${usd(v.cents)}${o.at ? " · " + new Date(o.at).toLocaleDateString() : ""}`;
+    row.querySelector(".o-st")!.textContent = STATUS[v.status] || v.status;
+    row.classList.add("st-" + v.status);
+  }, (e) => { box.querySelector(`[data-id="${i}"] .o-st`)!.textContent = msgOf(e); }));
 }
 
 // ---- a new order ----
@@ -53,7 +71,6 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const q = new URLSearchParams(location.search);
   const cart: Cart = { wedgie: 0, kit: 0 };
   if (q.get("item") === "kit") cart.kit = 1; else cart.wedgie = 1;
-  const yours = Object.entries(mem());
   box.innerHTML = `
     <div class="safe-box recess" id="o-cart">
       ${(Object.keys(ITEMS) as Item[]).map((k) => `
@@ -85,8 +102,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="row"><button class="btn btn-green" id="o-usdc" disabled>Pay in USDC</button>
         on <select id="o-chain">${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></p>
       <p class="fine" id="o-open">Checking the shop.</p>
-    </div>
-    ${yours.length ? `<div class="safe-box recess"><h2>Your orders</h2><p>${yours.map(([i]) => `<a href="/order/${esc(i)}">${esc(i)}</a>`).join(" · ")}</p></div>` : ""}`;
+    </div>`;
 
   let extra = 0;     // cents over list right now (catalog.ts); the server works it out again at checkout
   const paint = () => {
@@ -140,7 +156,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       const sealed = await seal({ ...s, cart });
       say(pay === "card" ? "Opening checkout." : "Making your order.");
       const r = await api({ cart, sealed, pay, chain: Number(box.querySelector<HTMLSelectElement>("#o-chain")!.value) });
-      remember(r.id, { token: r.token });
+      remember(r.id, { token: r.token, at: Date.now() });
       location.href = r.url || `/order/${r.id}`;
     } catch (e) { say(msgOf(e), true); b.disabled = false; }
   };
