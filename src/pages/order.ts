@@ -213,11 +213,18 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
     if (v.status === "canceled") h += `<p>Canceled.</p>`;
     h += `</div><div class="safe-box recess"><h2>Keep this link</h2><p class="fine">It's how you check on this order from anywhere. Anyone with it can see the order's status (never your address).</p>
-      <p><code class="safe-addr">${esc(link)}</code> <button class="btn btn-sm" id="o-copy">Copy</button></p></div>`;
+      <p><code class="safe-addr">${esc(link)}</code> <button class="btn btn-sm" id="o-copy">Copy</button></p></div>
+      <div class="safe-box recess"><h2>Public computer?</h2><p class="fine">Remove this order from this browser. You'll need the link to see it again.</p>
+      <p><button class="btn btn-sm btn-red" id="o-forget">Remove from this computer</button></p></div>`;
     box.innerHTML = h;
     tick();
     box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy!).then(() => say("Copied."))));
     box.querySelector<HTMLButtonElement>("#o-copy")!.onclick = () => navigator.clipboard.writeText(link).then(() => say("Copied."));
+    box.querySelector<HTMLButtonElement>("#o-forget")!.onclick = () => {
+      if (!confirm("Remove this order from this computer? Save the link first.")) return;
+      const m = mem(); delete m[id]; localStorage.setItem(MEM, JSON.stringify(m));
+      location.href = Object.keys(m).length ? "/orders" : "/";
+    };
     const send = box.querySelector<HTMLButtonElement>("#o-send");
     if (send) send.onclick = () => payWallet().catch((e) => { busy = false; paint(); say(msgOf(e), true); });
     const renew = box.querySelector<HTMLButtonElement>("#o-renew");
