@@ -372,9 +372,9 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (watching) return;
     watching = true;
     const open = () => { const w = v as View | null; return w?.status === "new" || w?.status === "expired" && !!w.got && w.got !== "0"; };
-    for (let i = 0; i < 200 && open(); i++) {
-      await sleep(5000);
-      if (v!.pay === "usdc" || mem()[id]?.tx || i < 24 || Date.now() > ends) await refresh();
+    for (let i = 0; i < 500 && open(); i++) {
+      await sleep(2000);
+      if (v!.pay === "usdc" || mem()[id]?.tx || i < 60 || Date.now() > ends) await refresh();
     }
     watching = false;
   }

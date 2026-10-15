@@ -42,16 +42,17 @@ export function cartOk(c: unknown): c is Cart {
 
 // USDC (Circle's own, 6 decimals) on each chain the shop takes, all paid to the shop's Safe (the same address
 // on every one: a chain goes here only once the Safe is deployed there). The server reads each chain through
-// SHOP_RPC_<chainId>. secs: block time, to find a payment's blocks; confirm: blocks to wait.
+// SHOP_RPC_<chainId>. secs: block time, to find a payment's blocks; confirm: blocks to wait (1 on the L2s: they
+// don't reorg in practice, and a buyer watching the page shouldn't wait).
 // A quote holds for QUOTE, USDC or card (a Stripe checkout lasts 30 minutes at least: the server ends it sooner).
 // The shop's Safe goes by its ENS name on the pay page.
 export const SHOP_ENS = { name: "wedgie.eth", address: "0xf5d3C7F2fACeAAc12A75d66e3BE4365A21d0d43C" };
 export const QUOTE = 10 * 60_000;
 export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: string; confirm: number; secs: number }> = {
-  8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 3, secs: 2 },
+  8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 1, secs: 2 },
   1: { name: "Ethereum", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", scan: "https://etherscan.io", confirm: 2, secs: 12 },
-  42161: { name: "Arbitrum", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", scan: "https://arbiscan.io", confirm: 20, secs: 0.25 },
-  10: { name: "Optimism", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", scan: "https://optimistic.etherscan.io", confirm: 3, secs: 2 },
+  42161: { name: "Arbitrum", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", scan: "https://arbiscan.io", confirm: 1, secs: 0.25 },
+  10: { name: "Optimism", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", scan: "https://optimistic.etherscan.io", confirm: 1, secs: 2 },
 };
 
 // What the buyer types, sealed in their browser (seal.ts) before it leaves it.

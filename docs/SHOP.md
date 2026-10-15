@@ -30,7 +30,7 @@ feed is over an hour old).
 - Too much: paid.
 - Paid with the page closed: the shipping computer's list (`GET /api/admin`) checks open orders and
   marks them paid.
-- The page checks every 5 seconds: Base, Arbitrum, Optimism show "Paid" in about 5–10 s, Ethereum about 30 s.
+- The page checks every 2 seconds: Base, Arbitrum, Optimism show "Paid" in about 2–4 s (1 block), Ethereum about 30 s.
 
 The addresses are CREATE2 (`src/shop/deposits.ts`), so nothing is deployed per order.
 
