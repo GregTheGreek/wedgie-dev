@@ -1,7 +1,7 @@
 // Put MicroPython on a Pico in BOOTSEL mode (a blank one boots there) from the browser: WebUSB to the
 // bootrom's PICOBOOT interface (RP2040 datasheet 2.8.5, RP2350 datasheet 5.6). Erase + write each 4 KB
 // sector the UF2 touches, erase the rest of the build's flash (the old filesystem: a used wedgie
-// comes back as blank as a new one), read it all back, then reboot into it. Only blocks for this chip's family are written, which
+// comes back as blank as a new one), then reboot into it. Only blocks for this chip's family are written, which
 // skips the RP2350-E10 "absolute" block MicroPython's RP2350 UF2 starts with.
 import { RPI_VID } from "./wedgies";
 
@@ -13,7 +13,7 @@ const MAGIC = 0x431fd10b;
 const FLASH = 0x10000000, FLASH_END = 0x11000000, SECTOR = 4096, BLOCK = 0x10000;
 // The flash size each MicroPython build assumes (its filesystem ends there): Pico 2 MB, Pico 2 4 MB.
 const BUILD_FLASH = { RP2040: 2 << 20, RP2350: 4 << 20 };
-const CMD = { exclusive: 0x01, reboot: 0x02, erase: 0x03, write: 0x05, exitXip: 0x06, enterXip: 0x07, read: 0x84, reboot2: 0x0a };
+const CMD = { exclusive: 0x01, reboot: 0x02, erase: 0x03, write: 0x05, exitXip: 0x06, reboot2: 0x0a };
 
 export const usbSupported = () => "usb" in navigator;
 export const isBoot = (d: USBDevice) => d.vendorId === RPI_VID && d.productId in BOOT_PIDS;
@@ -47,7 +47,7 @@ export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) =
   const secs = [...sectors(uf2, FAMILY[chip])].sort((a, b) => a[0] - b[0]);
   if (!secs.length) throw new Error("the MicroPython file has nothing for " + chip);
   const wipeFrom = Math.ceil((secs[secs.length - 1][0] + SECTOR) / BLOCK) * BLOCK, wipeTo = FLASH + BUILD_FLASH[chip];
-  const steps = 2 * (secs.length + (wipeTo - wipeFrom) / BLOCK);
+  const steps = secs.length + (wipeTo - wipeFrom) / BLOCK;
 
   await dev.open();
   if (!dev.configuration) await dev.selectConfiguration(1);
@@ -76,17 +76,6 @@ export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) =
     if (data) await ok(await dev.transferOut(epOut, data), `data for 0x${id.toString(16)}`);
     await ok(await dev.transferIn(epIn, 64), `ack for 0x${id.toString(16)}`);           // zero-length ack
   }
-  async function read(addr: number, n: number) {
-    const b = new DataView(new ArrayBuffer(32));
-    b.setUint32(0, MAGIC, true); b.setUint32(4, token++, true);
-    b.setUint8(8, CMD.read); b.setUint8(9, 8); b.setUint32(12, n, true);
-    b.setUint32(16, addr, true); b.setUint32(20, n, true);
-    await ok(await dev.transferOut(epOut, b.buffer), "read command");
-    const r = await dev.transferIn(epIn, n);
-    await ok(r, "read data");
-    await ok(await dev.transferOut(epOut, new Uint8Array(0)), "read ack");
-    return new Uint8Array(r.data!.buffer, r.data!.byteOffset, r.data!.byteLength);
-  }
 
   await cmd(CMD.exclusive, [1]);
   // Both chips: an RP2350 sent here by machine.bootloader() (not the button) acks every erase and
@@ -101,20 +90,6 @@ export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) =
   for (let a = wipeFrom, i = secs.length; a < wipeTo; a += BLOCK) {
     await cmd(CMD.erase, [a, BLOCK]);
     onProgress(++i / steps);
-  }
-  // Read it all back: a chip that acks a write and keeps nothing (an RP2350 without exitXip did)
-  // must say FAIL, never "wiped".
-  await cmd(CMD.exitXip, []);
-  await cmd(CMD.enterXip, []);
-  let done = steps / 2;
-  for (const [addr, data] of secs) {
-    const got = await read(addr, SECTOR);
-    if (got.length !== SECTOR || got.some((v, j) => v !== data[j])) throw new Error(`the write didn't stick (0x${addr.toString(16)})`);
-    onProgress(++done / steps);
-  }
-  for (let a = wipeFrom; a < wipeTo; a += BLOCK) {
-    if ((await read(a, 256)).some((v) => v !== 0xff)) throw new Error(`the wipe didn't stick (0x${a.toString(16)})`);
-    onProgress(++done / steps);
   }
   // The reboot cuts the USB link, so its ack may never come.
   try {

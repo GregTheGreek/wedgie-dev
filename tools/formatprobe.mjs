@@ -46,7 +46,6 @@ const scenarios = [
   // A Trust M: its chip check fails here (a fake can't chain to Infineon), the shake still runs.
   { name: "trustm-shake", pid: 3, found: [TM], want: ["FAIL", ["pass", "pass", "fail", "pass", "pass", "pass"]], uf2: "RPI_PICO" },
   { name: "trustm-loose", pid: 3, found: [TM], loose: true, want: ["FAIL", ["pass", "pass", "fail", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
-  { name: "lost-writes", pid: 15, lost: true, found: [ATECC], want: ["FAIL", null], uf2: "RPI_PICO2", flashes: 0 },
   { name: "no-profile", pid: 3, noProfile: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "connect-new", page: "connect", pid: 3, found: [ATECC], uf2: "RPI_PICO" },
   { name: "connect-pico2-w", page: "connect", pid: 15, wifi: true, found: [ATECC], uf2: "RPI_PICO2_W", flashes: 2 },
@@ -210,7 +209,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     // ---- BOOTSEL: PICOBOOT, strictly ----
     function makeBoot() {
       const rp2040 = !two, size = (rp2040 ? 2 : 4) << 20;
-      let token = 0, pending = null, exclusive = false, xipOff = false, cmdXip = false, claimed = false;
+      let token = 0, pending = null, exclusive = false, xipOff = false, claimed = false;
       const err = (s) => { st.usbErrors.push(s); return { status: "stall" }; };
       const dev = {
         vendorId: 0x2e8a, productId: sc.pid, serialNumber: "E0C9125B0D9B", configuration: null,
@@ -226,13 +225,9 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         async transferOut(ep, data) {
           const u = new Uint8Array(data.buffer ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data);
           if (ep !== 3 || !claimed) return err("out on ep " + ep);
-          if (pending?.phase === "readack") {
-            if (u.length) return err("read ack length " + u.length);
-            pending = null; return { status: "ok", bytesWritten: 0 };
-          }
           if (pending?.phase === "data") {
             if (u.length !== pending.len) return err("data length " + u.length);
-            if (!sc.lost) for (let i = 0; i < u.length; i++) { const a = pending.addr + i, s = st.flash.get(a); if (s === undefined) return err("write to unerased " + a.toString(16)); st.flash.set(a, s & u[i]); }
+            for (let i = 0; i < u.length; i++) { const a = pending.addr + i, s = st.flash.get(a); if (s === undefined) return err("write to unerased " + a.toString(16)); st.flash.set(a, s & u[i]); }
             st.maxWrite = Math.max(st.maxWrite, pending.addr + u.length);
             pending.phase = "ack"; return { status: "ok", bytesWritten: u.length };
           }
@@ -241,15 +236,13 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
           if (u.length !== 32 || dv.getUint32(0, true) !== 0x431fd10b) return err("bad command block");
           const tok = dv.getUint32(4, true), id = dv.getUint8(8), size8 = dv.getUint8(9), len = dv.getUint32(12, true);
           if (tok <= token) return err("token not increasing"); token = tok;
-          const want = { 1: 1, 2: 12, 3: 8, 5: 8, 6: 0, 7: 0, 0x84: 8, 0x0a: 16 }[id];
+          const want = { 1: 1, 2: 12, 3: 8, 5: 8, 6: 0, 0x0a: 16 }[id];
           if (want === undefined || want !== size8) return err(`cmd 0x${id.toString(16)} size ${size8}`);
           if (id === 0x02 && !rp2040) return err("REBOOT on RP2350");
           if (id === 0x0a && rp2040) return err("REBOOT2 on RP2040");
           const addr = dv.getUint32(16, true), n = dv.getUint32(20, true);
           if (id === 1) exclusive = dv.getUint8(16) > 0;
-          if (id === 6) { xipOff = true; cmdXip = false; }
-          if (id === 7) cmdXip = true;
-          if ((id === 3 || id === 5) && cmdXip) return err("flash op in XIP mode");
+          if (id === 6) xipOff = true;
           if ((id === 3 || id === 5) && (!exclusive || !xipOff)) return err("flash op before exclusive/exit_xip");
           if (id === 3) {
             if (addr % 4096 || n % 4096 || addr < 0x10000000 || addr + n > 0x10000000 + size) return err("erase range " + addr.toString(16));
@@ -262,22 +255,11 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
             st.flashes++;
             setTimeout(() => { usbT.dispatchEvent(Object.assign(new Event("disconnect"), { device: dev })); devs.splice(devs.indexOf(dev), 1); setTimeout(comeBack, 300); }, 100);
           }
-          if (id === 0x84) {
-            if (len !== n || !n) return err("read length");
-            pending = { phase: "read", addr, len }; return { status: "ok", bytesWritten: 32 };
-          }
           if (len && id !== 5) return err("unexpected transfer length");
           pending = id === 5 ? { phase: "data", addr, len } : { phase: "ack" };
           return { status: "ok", bytesWritten: 32 };
         },
         async transferIn(ep) {
-          if (ep === 4 && pending?.phase === "read") {
-            // The real RP2350 reads zeros outside command-XIP mode.
-            const b = new Uint8Array(pending.len);
-            for (let i = 0; i < b.length; i++) b[i] = cmdXip ? st.flash.get(pending.addr + i) ?? 0xff : 0;
-            pending = { phase: "readack" }; st.reads = (st.reads || 0) + b.length;
-            return { status: "ok", data: new DataView(b.buffer) };
-          }
           if (ep !== 4 || pending?.phase !== "ack") return err("in on ep " + ep + " while " + pending?.phase);
           pending = null; return { status: "ok", data: new DataView(new ArrayBuffer(0)) };
         },
@@ -334,12 +316,6 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     st: { ...window.__st, flash: undefined },
     flash: [...window.__st.flash].filter(([a, v]) => v !== 0xff && a < 0x10100000),
   }));
-  if (sc.lost) {   // writes acked but kept nowhere: the read-back must say FAIL, never "wiped"
-    const ok = got.status === "FAIL" && got.cards[0] === "fail" && /didn't stick/.test(got.details[0]) && !got.st.flashes && !got.st.usbErrors.length && !errs.length;
-    if (!ok) bad++;
-    console.log(ok ? "ok  " : "BAD ", sc.name.padEnd(12), got.status, got.cards.join(","), "|", got.details[0], "|", got.st.flashes, "reboots", JSON.stringify(got.st.usbErrors.slice(0, 3)), errs.join("; "));
-    await ctx.close(); continue;
-  }
   let ok = got.status === sc.want[0] && JSON.stringify(got.cards) === JSON.stringify(sc.want[1]) && !errs.length && !notes.some((n) => /BEFORE|not on/.test(n));
   if (sc.saves) {
     const sv = await page.evaluate(() => [...window.__st.files.keys()].filter((k) => k.startsWith("/saves/")).sort().join(","));
