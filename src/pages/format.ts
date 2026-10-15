@@ -33,8 +33,8 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.cha
 const RAW = "raw REPL; CTRL-B to exit\r\n>";
 const BOARD = 0, FW = 1, CHIP = 2, SHAKE = 3, BUTTONS = 4, COLORS = 5;
 // [what, Hz, seconds]: the Pico alone, the Trust M alone, both, both at 1 MHz (the margin). No Trust M: the Pico only.
-// 25 s in all (was 50: too long to keep shaking, Austin 2026-10-14).
-const SHAKE_AT: [string, number, number][] = [["pico", 0, 5], ["chip", 400000, 8], ["both", 400000, 7], ["both", 1000000, 5]];
+// 15 s in all (was 50: too long to keep shaking, Austin 2026-10-14).
+const SHAKE_AT: [string, number, number][] = [["pico", 0, 3], ["chip", 400000, 5], ["both", 400000, 4], ["both", 1000000, 3]];
 const PHASE: Record<string, string> = { pico: "Pico", chip: "Trust M", both: "Both" };
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
