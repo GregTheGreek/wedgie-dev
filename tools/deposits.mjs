@@ -30,7 +30,10 @@ if (cmd === "deploy") {
   if (cast("code", factory, "--rpc-url", rpc) !== "0x") { console.log("already there:", factory); process.exit(0); }
   const init = D.FACTORY_CODE + safe.toLowerCase().replace(/^0x/, "").padStart(64, "0");
   cast("send", D.DEPLOYER, "0x" + "00".repeat(32) + init.slice(2), "--rpc-url", rpc, "--private-key", process.env.DEPLOY_KEY);
-  if (cast("code", factory, "--rpc-url", rpc) === "0x") { console.error("deploy failed"); process.exit(1); }
+  for (let i = 0; cast("code", factory, "--rpc-url", rpc) === "0x"; i++) {   // the RPC can lag the receipt
+    if (i > 10) { console.error("deploy failed"); process.exit(1); }
+    execFileSync("sleep", ["2"]);
+  }
   console.log("deployed:", factory);
 }
 if (cmd === "sweep") {
