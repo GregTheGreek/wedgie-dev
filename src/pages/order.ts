@@ -180,6 +180,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="row"><button class="btn btn-green" id="o-usdc" disabled>Pay in USDC</button>
         on <select id="o-chain">${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></p>
       <p class="fine" id="o-open">Checking the shop.</p>
+      <p class="fine">Paying means you agree to the <a href="/terms" target="_blank">Terms of Sale</a>. Sold by BuidlGuidl LLC.</p>
     </div>
     <p class="fine"><a href="/signin">Ordered before? Sign in</a></p>`;
 

@@ -15,6 +15,7 @@ import { debug } from "./pages/debug";
 import { safe } from "./pages/safe";
 import { secret } from "./pages/secret";
 import { order, session } from "./pages/order";
+import { legal } from "./pages/legal";
 
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
@@ -28,6 +29,7 @@ const onDebug = path === "/debug";
 const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or one Safe (/safe/<chain>:<address>)
 const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
+const onLegal = path === "/terms" || path === "/privacy";
 const signedIn = !!session();
 
 const app = document.getElementById("app")!;
@@ -42,6 +44,7 @@ app.innerHTML = `
 <footer class="foot">
   <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
   <p>Hardware, case, firmware, and this site are MIT licensed. Build it, fork it, sell it.</p>
+  <p class="fine">Sold by BuidlGuidl LLC · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:wedgie@buidlguidl.com">wedgie@buidlguidl.com</a></p>
   <p class="fine"><a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">wedgie-dev</a> ·
   <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">case</a> ·
   <a href="https://github.com/austintgriffith/picowallet" target="_blank" rel="noopener">picowallet</a></p>
@@ -88,5 +91,5 @@ const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
 if (onFormat || onUpdate) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : home(top);
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());
