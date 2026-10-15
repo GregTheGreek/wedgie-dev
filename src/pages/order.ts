@@ -102,7 +102,7 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   function sent(e: string) {
     box.innerHTML = `<div class="safe-box recess order-sent"><h2>Check your email</h2><p><b>${esc(e)}</b></p>
       <p>Tap the link in it. This page signs in by itself.</p>
-      <p class="fine">Nothing there? Check spam. We only email addresses that have ordered.</p>
+      <p class="fine">Nothing there? Check spam.</p>
       <p><button class="btn btn-sm" id="o-again">Use a different email</button></p></div>`;
     box.querySelector<HTMLButtonElement>("#o-again")!.onclick = () => { clearInterval(t); ask(); };
     const t = setInterval(() => { if (session()) { clearInterval(t); location.replace("/orders"); } }, 1000);
@@ -115,7 +115,8 @@ const STATUS: Record<string, string> = { new: "Not paid", expired: "Time ran out
 async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const s = session();
   if (s) {
-    try { keep((await login({ session: s.token })).orders); }
+    const claim = Object.entries(mem()).map(([id, o]) => ({ id, token: o.token }));
+    try { keep((await login({ session: s.token, claim })).orders); }
     catch (e) { if (/Signed out/.test(msgOf(e))) { localStorage.removeItem(SESSION); return location.reload(); } say(msgOf(e), true); }
   }
   const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));

@@ -1,7 +1,8 @@
 // /api/login: sign in by email to see your orders on any device.
-//   POST {email}       a sign-in link (/signin#<token>) goes to that email, if it has orders. Same answer either way.
+//   POST {email}       a sign-in link (/signin#<token>) goes to that email
 //   POST {link}        the link's token -> {session, until, orders}. Works once, 15 minutes.
-//   POST {session}     -> {until, orders}; 401 once it's over (SESSION_DAYS) or signed out
+//   POST {session}     -> {until, orders}; 401 once it's over (SESSION_DAYS) or signed out.
+//                      + claim: [{id, token}] (this device's orders): ones with no email yet join this email
 //   POST {signout}     the session ends
 // orders: [{id, token, at}]; the tokens (_mail.ts tokenOf) open each order's page. One link a minute, 5 an hour,
 // per email. Only hashes are stored.
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
   const sql = await db();
   if (typeof b?.email === "string") return ask(sql, b.email, new URL(req.url).origin);
   if (typeof b?.link === "string") return follow(sql, b.link);
-  if (typeof b?.session === "string") return mine(sql, b.session);
+  if (typeof b?.session === "string") return mine(sql, b.session, Array.isArray(b.claim) ? b.claim.slice(0, 50) : []);
   if (typeof b?.signout === "string") { await sql`delete from sessions where token_hash = ${await sha256(b.signout)}`; return json({ ok: true }); }
   return oops("Bad request.");
 }
@@ -31,12 +32,9 @@ async function ask(sql: Sql, email: string, origin: string) {
     from links where email_hash = ${h} and created > now() - interval '1 hour'`;
   if (r.minute) return oops("We just sent one. Wait a minute.", 429);
   if (r.hour >= 5) return oops("Too many tries. Wait an hour.", 429);
-  const [has] = await sql`select 1 from orders where email_hash = ${h} limit 1`;
-  if (has) {
-    const token = randomHex(16);
-    await sql`insert into links (token_hash, email_hash) values (${await sha256(token)}, ${h})`;
-    try { await signinMail(email.trim(), `${origin}/signin#${token}`); } catch { return oops("Couldn't send the email. Try again soon.", 503); }
-  }
+  const token = randomHex(16);
+  await sql`insert into links (token_hash, email_hash) values (${await sha256(token)}, ${h})`;
+  try { await signinMail(email.trim(), `${origin}/signin#${token}`); } catch { return oops("Couldn't send the email. Try again soon.", 503); }
   return json({ ok: true });
 }
 
@@ -51,9 +49,11 @@ async function follow(sql: Sql, link: string) {
   return json({ session, until: new Date(s.expires).getTime(), orders: await orders(sql, l.email_hash) });
 }
 
-async function mine(sql: Sql, session: string) {
+async function mine(sql: Sql, session: string, claim: any[]) {
   const [s] = await sql`select email_hash, expires from sessions where token_hash = ${await sha256(session)} and expires > now()`;
   if (!s) return oops("Signed out.", 401);
+  for (const c of claim) if (typeof c?.id === "string" && typeof c?.token === "string")
+    await sql`update orders set email_hash = ${s.email_hash} where id = ${c.id} and token_hash = ${await sha256(c.token)} and email_hash is null`;
   return json({ until: new Date(s.expires).getTime(), orders: await orders(sql, s.email_hash) });
 }
 

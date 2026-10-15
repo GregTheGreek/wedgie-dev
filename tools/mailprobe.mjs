@@ -4,7 +4,7 @@
 //   2. paid: one "paid" mail, with the order's link
 //   3. sign in: a mail with a green button to /signin#<token>; the link gives a session and the order's token, once;
 //      the session lists the orders; a 2nd send waits a minute; signed out, the session is dead
-//   4. an email with no orders: same answer, no mail
+//   4. an email with no orders still gets a link; signed in, it claims this device's order
 //   5. shipped: a mail with the tracking number; the locked email is wiped
 //   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out forgets all
 // Run: node tools/mailprobe.mjs
@@ -58,8 +58,14 @@ await call(login.POST, { signout: got.session });
 ok((await call(login.POST, { session: got.session })).status === 401, "signed out: the session is dead");
 
 // 4
-const before = mails().length;
-ok((await call(login.POST, { email: "nobody@example.com" })).ok && mails().length === before, "no orders: the same answer, no mail");
+ok((await call(login.POST, { email: "nobody@example.com" })).ok, "no orders: still asks for a link");
+const nl = mails().filter((m) => m.to === "nobody@example.com").pop()?.text.match(/signin#([0-9a-f]{32})/)?.[1];
+const ns = await call(login.POST, { link: nl });
+ok(ns.session && ns.orders.length === 0, "no orders: the link signs in, no orders");
+const old = await call(order.POST, { ...base, email: "other@example.com" });
+await sql`update orders set email_hash = null where id = ${old.id}`;
+ok((await call(login.POST, { session: ns.session, claim: [{ id: old.id, token: old.token }] })).orders?.[0]?.id === old.id, "signed in: this device's old order (no email) joins the account");
+ok((await call(login.POST, { session: ns.session, claim: [{ id: o.id, token: "0".repeat(32) }] })).orders.length === 1, "a wrong token claims nothing");
 
 // 5
 const auth = { authorization: "Bearer " + "t".repeat(40) };
