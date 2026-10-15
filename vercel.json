@@ -125,6 +125,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/secret",
+      "destination": "/index.html"
+    },
+    {
       "source": "/order",
       "destination": "/index.html"
     },

@@ -561,6 +561,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-box h2 { font-size: 15px; margin: 0 0 10px; }
 .safe-box p { margin: 8px 0; }
 .safe-box input, .safe-box select { font: inherit; font-size: 14px; padding: 6px 8px; max-width: 100%; }
+.secret-page textarea { width: 100%; box-sizing: border-box; font: 14px var(--mono); padding: 8px; border-radius: 8px; border: 1px solid #ccc; resize: vertical; }
+.secret-page textarea[readonly] { word-break: break-all; }
 .safe-addr { word-break: break-all; font-size: 14px; }
 .safe-list { list-style: none; padding: 0; margin: 0; }
 .safe-info { border-top: 1px solid rgba(0,0,0,.08); margin-top: 12px; padding-top: 4px; }
