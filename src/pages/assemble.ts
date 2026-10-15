@@ -1,21 +1,22 @@
-// /assemble: the whole build, one step per card, with the fiddly parts the front page skips
-// (cutting, stripping, seating and taping the chip's wires). Each step has a photo slot.
+// /assemble: the whole build, one step per card: the words, a drawing made from Austin's photo of that
+// step, and the real photos under it (tap one to see it big). Source of truth for the steps:
+// clawd-pico-case/assembly/ASSEMBLY.md. Drawings and photos: public/img/assemble/ (tools/asmimg.py).
 import "./assemble.css";
 
-type Step = { t: string; p: string; shot?: string; art?: string; tip?: string; warn?: string };
+type Step = { t: string; p: string; d: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
-// The hat's header seen from the Pico side, USB end up: the top 8 holes of each row. The four
-// the chip uses are lit; the 4th on the right (3V3_EN) is struck out.
+// The screen board's sockets seen from above (board face down, USB end up): the top 8 holes of each
+// row. The four the chip uses are filled with their wire's color; the 4th on the right is struck out.
 const HEADER = (() => {
   const L = ["GP0", "GP1", "GND", "GP2", "GP3", "GP4", "GP5", "GND"];
   const R = ["VBUS", "VSYS", "GND", "3V3_EN", "3V3", "VREF", "GP28", "AGND"];
-  const use: Record<string, [string, string]> = { "L5": ["SDA", "wire 3"], "L6": ["SCL", "wire 4"], "R2": ["GND", "wire 1"], "R4": ["3.3 V", "wire 2"] };
+  const use: Record<string, [string, string]> = { "L5": ["Black", "black"], "L6": ["Red", "red"], "R2": ["White", "white"], "R4": ["Yellow", "yellow"] };
   const y = (i: number) => 58 + i * 30;
   let s = "";
   for (let i = 0; i < 8; i++) {
     for (const [side, x, names] of [["L", 150, L], ["R", 250, R]] as const) {
       const u = use[side + i], no = side === "R" && i === 3;
-      s += `<rect class="hole${u ? " lit" : ""}${no ? " no" : ""}" x="${x - 11}" y="${y(i) - 11}" width="22" height="22" rx="5"/>`;
+      s += `<rect class="hole${u ? " w-" + u[1] : ""}${no ? " no" : ""}" x="${x - 11}" y="${y(i) - 11}" width="22" height="22" rx="5"/>`;
       if (no) s += `<path class="x" d="M${x - 7} ${y(i) - 7}l14 14m0-14l-14 14"/>`;
       const tx = side === "L" ? x - 22 : x + 22, a = side === "L" ? "end" : "start";
       s += `<text class="pn${u ? " on" : ""}" x="${tx}" y="${y(i) + 4}" text-anchor="${a}">${names[i]}</text>`;
@@ -23,48 +24,85 @@ const HEADER = (() => {
     }
     s += `<text class="rn" x="200" y="${y(i) + 4}" text-anchor="middle">${i + 1}</text>`;
   }
-  return `<svg class="header-art" viewBox="0 0 400 300" role="img" aria-label="The hat's header from the Pico side, USB end up. SDA left 6th, SCL left 7th, GND right 3rd, 3.3 volts right 5th. Never the right 4th.">
+  return `<svg class="header-art" viewBox="0 0 400 300" role="img" aria-label="The screen board's sockets, face down, USB end up. White in the right row's 3rd, yellow right 5th, black left 6th, red left 7th. Never the right 4th.">
     <rect class="usb" x="170" y="6" width="60" height="22" rx="6"/><text class="usbt" x="200" y="21" text-anchor="middle">USB</text>
     <rect class="strip" x="132" y="38" width="36" height="252" rx="9"/><rect class="strip" x="232" y="38" width="36" height="252" rx="9"/>
     ${s}</svg>`;
 })();
 
 const STEPS: Step[] = [
-  { t: "Lay out the parts",
-    p: `A Pico with headers, the Waveshare Pico-LCD-1.3 hat, the Adafruit OPTIGA Trust M breakout (or an ATECC608), and a STEMMA QT / Qwiic cable with bare ends. For tools: small cutters or scissors, a wire stripper, a strip of tape, and one breadboard jumper pin.`,
-    shot: "parts" },
-  { t: "Cut the wires short",
-    p: `The cable comes long. Keep the plug and cut all four wires <b>short and even</b>, just long enough to reach from the chip to the header when the chip lies flat between the boards. Long wires bunch up and push on the back of the screen.`,
-    shot: "cut" },
-  { t: "Strip the ends",
-    p: `Strip a short piece of insulation off each wire, enough bare copper to go down into a header hole and no more. Twist each end tight so no stray strand can touch the next hole.`,
-    shot: "strip", tip: `The wires are thin. Close the stripper gently so it takes the plastic, not the copper.` },
-  { t: "Find the GND end of the plug",
-    p: `The plug's four contacts run <b>GND, 3.3 V, SDA, SCL</b> from one end. Count from the GND end. <b>Trust the order, not the colors</b>: Adafruit uses black, red, blue, yellow, but other bags use other colors.`,
-    shot: "plug" },
-  { t: "Push the wires into the header",
-    p: `Hold the hat screen down, joystick end at the top (that's where the Pico's USB will sit), and look at the empty header socket. Count holes down from the top:`,
-    art: HEADER,
-    tip: `Each wire shares its hole with a Pico pin: the wire goes in first, the pin goes in beside it, and the spring contact holds both.`,
-    warn: `Never put anything in the 4th hole on the right. That's 3V3_EN: grounding it switches the 3.3 V supply off. And never use VBUS or VSYS, they're 5 V.` },
-  { t: "Tape the wires down",
-    p: `Once all four are in, lay a strip of tape across the header to hold them in place. Then pop a hole through the tape over each hole with a breadboard pin, so the Pico's pins can go straight through. The tape keeps the wires from pulling out while you do the rest.`,
-    shot: "tape" },
-  { t: "Plug the Pico in",
-    p: `Press the Pico into the hat's header: <b>the Pico's chips and BOOTSEL button facing you, away from the screen, and its USB at the joystick end</b>. Push straight, never at an angle. Every pin goes in, none outside the socket. Then tug each wire lightly: none should come out.`,
-    shot: "pico" },
-  { t: "Wedge the chip in",
-    p: `Slide the chip board flat into the gap between the Pico and the hat, wires lying flat, so nothing presses on the back of the screen and the chip touches no Pico pin. That's the wedgie.`,
-    shot: "wedge" },
+  { t: "Cable and tools",
+    p: `The 4-wire cable (white, yellow, black, red) with its small plug, wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    d: "01", ph: ["01-cable-and-strippers"] },
+  { t: "How the plug fits the chip",
+    p: `The plug goes into the Trust M chip board. This is just to show the fit: you plug it in for real at step 10. Wire order across the plug: <b>white, yellow, black, red</b>.`,
+    d: "02", ph: ["02-cable-into-trust-m"] },
+  { t: "Cut and strip the wires",
+    p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
+    d: "03", ph: ["03-cut-and-stripped-a", "03-cut-and-stripped-b"] },
+  { t: "Lay out the screen board",
+    p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
+    d: "04", ph: ["04-board-and-wiring-guide"], art: HEADER,
+    warn: `Never put anything in the 4th socket on the right row.` },
+  { t: "Push in white and yellow",
+    p: `Twist the strands at each tip tight, so each acts like one solid wire. Push <b>white into the 3rd</b> and <b>yellow into the 5th</b> socket on the right row.`,
+    d: "05", ph: ["05-white-yellow-in-header"] },
+  { t: "Tape over the wires",
+    p: `A small piece of electrical tape over those sockets, right on top of the wires, holds them in.`,
+    d: "06", ph: ["06-tape-over-wires"] },
+  { t: "Poke the holes open",
+    p: `Push the stiff jumper wire through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
+    d: "07", ph: ["07-poke-holes-through-tape"] },
+  { t: "Black and red, same way",
+    p: `On the left row: <b>black into the 6th</b>, <b>red into the 7th</b>. Tape over them. Poke the holes open.`,
+    d: "08", ph: ["08-black-red-guide", "08-black-red-in-header", "08-black-red-taped"] },
+  { t: "Header ready",
+    p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
+    d: "09", ph: ["09-header-ready"] },
+  { t: "Stack the boards",
+    p: `Plug the cable into the Trust M. Lay the Trust M at an angle on the back of the screen board. Push the Pico into the sockets, <b>USB-C at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
+    d: "10", ph: ["10-stacked-top", "10-chip-wedged", "10-headers-flush"],
+    warn: `No pin, wire or chip sticking out. If anything does, do it again: it won't fit the case.` },
+  { t: "Test the boards",
+    p: `Hold the Pico's <b>BOOTSEL</b> button (tweezers help) and plug in a USB-C data cable. Always hold it: many Picos come with software on them and won't show up without it. Open <a href="/test">wedgie.dev/test</a> in Chrome and click <b>Test it</b>. Don't unplug while it runs. Wait for <b>Board, Firmware, Chip</b> to go green, then unplug. Shake, Buttons and Colors come after the case is on.`,
+    d: "11", ph: ["11-bootsel", "11-test-page", "11-test-wiping", "11-test-firmware"],
+    tip: `First time on this computer? The test page has a one-time setup so Chrome stops asking about every new Pico.`,
+    warn: `Chip fails? A wire is in the wrong socket, a wire came out, or the Trust M touches a Pico pin. Take it apart and check.` },
+  { t: "Pick the base",
+    p: `The base color says what's inside: <b>red</b> is a Pico W with a battery, <b>black</b> is the Trust M chip, <b>gray</b> is the ATECC608. This build is Trust M, so black.`,
+    d: "12", ph: ["12-bases"] },
+  { t: "Peel the screen protector",
+    p: `Pull the blue tab off the screen.`,
+    d: "13", ph: ["13-screen-protector"] },
+  { t: "Case parts",
+    p: `White lid, black base, joystick cap, 2 gray buttons, 1 green, 1 red.`,
+    d: "14", ph: ["14-case-parts"] },
+  { t: "Joystick cap",
+    p: `Line up the square hole with the joystick and press hard until it snaps. It takes more force than you'd think. It should stay on upside down and click up, down, left, right and in.`,
+    d: "15", ph: ["15-joystick-on", "15-joystick-side", "15-joystick-gap"],
+    tip: `The small gap under the cap's rim is on purpose, so it can tilt.` },
+  { t: "Buttons into the lid",
+    p: `Lay the lid face down at the edge of the mat, so the buttons can hang out the front. Drop them in with tweezers: <b>green, gray, gray, red</b>. Green sits over the board's A button, red over Y.`,
+    d: "16", ph: ["16-buttons-tweezers", "16-buttons-placed", "16-ready"] },
+  { t: "Boards into the base",
+    p: `Screen up, <b>USB-C end first</b> into the base's hole, then lower the rest. Don't force it straight down. The screen board lies flat on the rails, the USB port centered in the hole.`,
+    d: "17", ph: ["17-in-base", "17-usb-centered"] },
   { t: "Close the case",
-    p: `Seat the Pico's USB connector into the base's port first, then lower the boards in; don't force them straight down. Put the joystick cap and the four button caps on, then press the lid on until the hidden catches click. To open it again, use the pry notch on one side.`,
-    shot: "case" },
-  { t: "Plug it in and test it",
-    p: `Use a data USB-C cable (not a charge-only one). Press <b>Allow wedgie connection</b> at the top and pick it; it boots to the underwear. Open it on the Connect page and run <b>Test → Check the chip</b>, then the screen and button tests.`,
-  },
+    p: `Flip the base over and lower it, screen down, into the lid (still face down, buttons in). Line it up and press hard until it snaps. It's tight on purpose.`,
+    d: "18", ph: ["18-lower-into-lid", "18-press-closed", "18-closed", "18-closed-usb"] },
+  { t: "Check the feel",
+    p: `Press every button. Push the joystick every way and straight in. Each should click. Look for anything off: a tilted joystick, a stuck button.`,
+    d: "19", ph: ["18-closed"] },
+  { t: "Full test",
+    p: `Plug it in: it shows <b>No software</b>. On <a href="/test">wedgie.dev/test</a> click <b>Test only</b>. The wedgie shows a red FULL CONTROL warning: press green on the wedgie. Then the chip check, then <b>shake</b> it (tap, squeeze, light drops on each side) until the counter stops, press each button it asks for, and check each color for scratches or dead pixels. <b>PASS</b> on the wedgie and the page: done.`,
+    d: "20", ph: ["20-no-software", "20-test-only", "20-full-control", "20-press-green", "20-shake", "20-buttons", "20-colors", "20-pass", "20-pass-page"],
+    tip: `Need to wipe it after the case is closed? Press BOOTSEL through the small hole in the base with a paperclip while you plug it in.` },
+  { t: "Box it",
+    p: `Put it in the box. Build the next one.`,
+    d: "21", ph: ["21-box"], end: `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` },
 ];
 
-const shot = (k: string) => `<figure class="shot" data-shot="${k}"><span>photo coming</span></figure>`;
+const IMG = "/img/assemble/";
 
 export function assemble(main: HTMLElement) {
   main.innerHTML = `
@@ -72,32 +110,41 @@ export function assemble(main: HTMLElement) {
     <div class="sec-head">
       <span class="kicker">Assembly</span>
       <h2>Put a wedgie together.</h2>
-      <p>No soldering. Ten steps, and the only fiddly one is the wires. Take your time on steps 2 to 6 and the rest just clicks.</p>
+      <p>No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks.</p>
     </div>
     <ol class="asm-steps">
       ${STEPS.map((s, i) => `
-      <li class="card asm-step${s.shot || s.art ? "" : " solo"}" id="step-${i + 1}">
+      <li class="card asm-step" id="step-${i + 1}">
         <div class="asm-copy">
           <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3></div>
           <p>${s.p}</p>
-          ${s.art ? `<ul class="pins">
-            <li><b>GND</b> right 3rd</li><li><b>3.3 V</b> right 5th</li><li><b>SDA</b> left 6th</li><li><b>SCL</b> left 7th</li></ul>` : ""}
+          ${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}
           ${s.tip ? `<p class="note">${s.tip}</p>` : ""}
           ${s.warn ? `<p class="note bad">${s.warn}</p>` : ""}
-          ${i === STEPS.length - 1 ? `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` : ""}
+          ${s.end || ""}
         </div>
-        ${s.art ? `<div class="asm-art recess">${s.art}</div>` : s.shot ? shot(s.shot) : ""}
+        <figure class="draw">
+          <img src="${IMG}d${s.d}.webp" alt="Step ${i + 1}: ${s.t}" loading="lazy">
+          <figcaption class="photos">${s.ph.map((f) => `<button type="button" data-ph="${f}" aria-label="Photo"><img src="${IMG}t/${f}.webp" alt="" loading="lazy"></button>`).join("")}</figcaption>
+        </figure>
       </li>`).join("")}
     </ol>
 
     <div class="card asm-trouble">
       <h3>If something's off</h3>
       <dl>
-        <dt>It doesn't show up on USB</dt><dd>A charge-only cable, or the board is in BOOTSEL mode (it shows up as a drive instead).</dd>
-        <dt>The screen stays black</dt><dd>The hat isn't fully seated. Press the Pico straight in until every pin is down.</dd>
-        <dt>No chip found</dt><dd>Wires placed by color instead of plug order, a wire in the right 4th hole, or the chip board touching a Pico pin. If the chip's light is on but it isn't found, a data wire and the power wire are swapped: swap them.</dd>
-        <dt>A wire keeps coming out</dt><dd>Twist the bare end tighter, push it all the way down, and tape before the Pico goes in.</dd>
+        <dt>It doesn't show up on USB</dt><dd>A charge-only cable, or BOOTSEL wasn't held while plugging in.</dd>
+        <dt>The screen stays black</dt><dd>The Pico isn't fully seated. Press it straight in until it's flush.</dd>
+        <dt>No chip found</dt><dd>A wire in the wrong socket, a wire that came out, or the chip board touching a Pico pin.</dd>
+        <dt>A wire keeps coming out</dt><dd>Twist the bare end tighter, push it all the way down, and tape it before the Pico goes in.</dd>
       </dl>
     </div>
+    <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
   </section>`;
+
+  const big = main.querySelector<HTMLDialogElement>(".asm-big")!, bigImg = big.querySelector("img")!;
+  main.querySelectorAll<HTMLButtonElement>("[data-ph]").forEach((b) => b.addEventListener("click", () => {
+    bigImg.src = `${IMG}p/${b.dataset.ph}.webp`; big.showModal();
+  }));
+  big.addEventListener("click", () => big.close());
 }
