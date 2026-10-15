@@ -197,6 +197,15 @@
           }
         }
       ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-blocks",
+      "sha": "505ea0d3f43b312512a71117bd5445dbf393555b",
+      "at": "2026-10-15T02:25:56Z",
+      "approved": "2026-10-15",
+      "v": {
+        "blocks": "bae87e54c96d"
+      }
     }
   ]
 }

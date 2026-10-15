@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "blocks",
+      "name": "Blocks",
+      "about": "Falling blocks. Fill a row to clear it.",
+      "files": [
+        "blocks.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "label": "#2864e6",
+      "icon": [
+        "............",
+        "....kkkk....",
+        "....kyyk....",
+        "....kyyk....",
+        "....kkkk....",
+        "............",
+        "kkkkkk..kkkk",
+        "kbbbbk..kggk",
+        "kbbkkkkkkggk",
+        "kbbkrrrrkggk",
+        "kkkkrrrrkkkk",
+        "...kkkkkk..."
+      ]
+    }
+  ]
+}
