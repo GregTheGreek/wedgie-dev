@@ -1,0 +1,62 @@
+/* The printed assembly manual (tools/asmpdf.mjs). Letter, two steps a page, drawing left, words right. */
+@font-face { font-family: "Nunito"; src: url("NUNITO") format("woff2"); font-weight: 200 1000; }
+@font-face { font-family: "DM Mono"; src: url("DMMONO") format("woff2"); font-weight: 500; }
+@page { size: letter; margin: 0.55in 0.6in 0.65in; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 500 11.5pt/1.45 "Nunito", sans-serif; color: #1a1b1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+b { font-weight: 900; }
+h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
+
+/* cover */
+.cover { height: 9.7in; display: flex; flex-direction: column; break-after: page; }
+.cover .kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 11pt; }
+.cover h1 { font-size: 40pt; margin: 6px 0 10px; }
+.cover .lede { font-size: 14pt; color: #474947; max-width: 5.6in; }
+.cover .qr { margin-top: 26px; display: flex; gap: 22px; align-items: center; padding: 18px; border: 2px solid #e2e2dd; border-radius: 18px; }
+.cover .qr svg { width: 1.7in; height: 1.7in; flex-shrink: 0; }
+.cover .qr p { margin: 0; font-size: 13pt; }
+.cover .qr .url { font-weight: 900; font-size: 17pt; color: #168c34; margin-top: 4px; }
+.cover h2 { font-size: 15pt; margin: 26px 0 8px; }
+.cover ul { margin: 0; padding-left: 20px; columns: 2; column-gap: 30px; }
+.cover li { margin: 2px 0; break-inside: avoid; }
+.cover .art { margin-top: auto; text-align: center; }
+.cover .art img { max-height: 3.1in; max-width: 100%; }
+
+/* steps */
+.step { display: grid; grid-template-columns: 3.1in 1fr; gap: 22px; align-items: start; break-inside: avoid;
+  height: 4.75in; padding: 14px 0; border-top: 2px solid #e2e2dd; }
+.step:nth-child(even) { break-before: page; border-top: 0; }   /* the cover is child 1 */
+.draw { height: 4.4in; display: flex; align-items: center; justify-content: center; background: #faf8f4; border-radius: 14px; overflow: hidden; }
+.draw img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; color: #fff; font-weight: 900; font-size: 15pt;
+  display: flex; align-items: center; justify-content: center; background: #168c34; }
+.num.c1 { background: #48494b; } .num.c2 { background: #b8201b; }
+.head h3 { font-size: 16pt; }
+.copy p { margin: 0 0 8px; }
+.note { font-size: 10.5pt; padding: 8px 12px 8px 14px; border-radius: 10px; background: #eeeeea; border-left: 5px solid #22c452; }
+.note.bad { border-left-color: #e3312c; background: #fbeceb; }
+.art { margin: 6px 0 10px; }
+.header-art { width: 100%; max-height: 2.5in; display: block; }
+.header-art .strip { fill: #2a2b2c; }
+.header-art .hole { fill: #121313; stroke: #3c3d3f; stroke-width: 1.5; }
+.header-art .hole.w-white { fill: #fdfdfb; stroke: #9a9c99; stroke-width: 2.5; }
+.header-art .hole.w-yellow { fill: #f2c21b; stroke: #a7830a; }
+.header-art .hole.w-black { fill: #000; stroke: #e8e8e4; stroke-width: 2.5; }
+.header-art .hole.w-red { fill: #e3312c; stroke: #9c1d19; }
+.header-art .hole.no { fill: #3a1b1a; stroke: #e3312c; }
+.header-art .x { stroke: #ff6a62; stroke-width: 3; stroke-linecap: round; }
+.header-art .usb { fill: #fff; stroke: #cfcfca; stroke-width: 1.5; }
+.header-art .usbt { font: 800 11px "Nunito"; fill: #6b6e6b; letter-spacing: .1em; }
+.header-art .pn { font: 500 10px "DM Mono"; fill: #9a9c99; }
+.header-art .pn.on { fill: #1a1b1a; }
+.header-art .rn { font: 800 10px "Nunito"; fill: #6f7072; }
+.header-art .wl { font: 900 14px "Nunito"; fill: #168c34; }
+
+/* last page */
+.trouble { break-before: page; }
+.trouble h2 { font-size: 20pt; margin-bottom: 12px; }
+.trouble dt { font-weight: 900; margin-top: 12px; }
+.trouble dd { margin: 2px 0 0; color: #474947; }
+.trouble .more { margin-top: 30px; display: flex; gap: 18px; align-items: center; }
+.trouble .more svg { width: 1.1in; height: 1.1in; }

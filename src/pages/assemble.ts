@@ -7,7 +7,7 @@ type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?
 
 // The screen board's sockets seen from above (board face down, USB end up): the top 8 holes of each
 // row. The four the chip uses are filled with their wire's color; the 4th on the right is struck out.
-const HEADER = (() => {
+export const HEADER = (() => {
   const L = ["GP0", "GP1", "GND", "GP2", "GP3", "GP4", "GP5", "GND"];
   const R = ["VBUS", "VSYS", "GND", "3V3_EN", "3V3", "VREF", "GP28", "AGND"];
   const use: Record<string, [string, string]> = { "L5": ["Black", "black"], "L6": ["Red", "red"], "R2": ["White", "white"], "R4": ["Yellow", "yellow"] };
@@ -30,7 +30,7 @@ const HEADER = (() => {
     ${s}</svg>`;
 })();
 
-const STEPS: Step[] = [
+export const STEPS: Step[] = [
   { t: "Cable and tools",
     p: `The 4-wire cable (white, yellow, black, red) with its small plug, wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
@@ -113,6 +113,14 @@ const STEPS: Step[] = [
     d: "21", ph: ["21-box"], end: `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` },
 ];
 
+// "If something's off", on the page and in the printed manual.
+export const TROUBLE: [string, string][] = [
+  ["It doesn't show up on USB", "A charge-only cable, or BOOTSEL wasn't held while plugging in."],
+  ["The screen stays black", "The Pico isn't fully seated. Press it straight in until it's flush."],
+  ["No chip found", "A wire in the wrong socket, a wire that came out, or the chip board touching a Pico pin."],
+  ["A wire keeps coming out", "Twist the bare end tighter, push it all the way down, and tape it before the Pico goes in."],
+];
+
 const IMG = "/img/assemble/";
 
 export function assemble(main: HTMLElement) {
@@ -121,7 +129,7 @@ export function assemble(main: HTMLElement) {
     <div class="sec-head">
       <span class="kicker">Assembly</span>
       <h2>Put a wedgie together.</h2>
-      <p>No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks.</p>
+      <p>No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks. <a href="/assemble.pdf" download>Print the manual (PDF)</a></p>
     </div>
     <ol class="asm-steps">
       ${STEPS.map((s, i) => `
@@ -144,10 +152,7 @@ export function assemble(main: HTMLElement) {
     <div class="card asm-trouble">
       <h3>If something's off</h3>
       <dl>
-        <dt>It doesn't show up on USB</dt><dd>A charge-only cable, or BOOTSEL wasn't held while plugging in.</dd>
-        <dt>The screen stays black</dt><dd>The Pico isn't fully seated. Press it straight in until it's flush.</dd>
-        <dt>No chip found</dt><dd>A wire in the wrong socket, a wire that came out, or the chip board touching a Pico pin.</dd>
-        <dt>A wire keeps coming out</dt><dd>Twist the bare end tighter, push it all the way down, and tape it before the Pico goes in.</dd>
+        ${TROUBLE.map(([q, a]) => `<dt>${q}</dt><dd>${a}</dd>`).join("")}
       </dl>
     </div>
     <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
