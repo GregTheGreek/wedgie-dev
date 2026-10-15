@@ -96,7 +96,7 @@ const STEPS: Step[] = [
     warn: `The USB-C port must sit right in the middle of the hole. If it doesn't, something is wrong: take it out and do it again before you close the case.` },
   { t: "Check the USB-C fit",
     p: `Look at the USB-C end. The port must line up perfectly with the hole in the base.`,
-    d: "15p", ph: ["15-usb-fit-check"],
+    d: "15q", ph: ["15-usb-fit-check"],
     warn: `Not lined up? Push the Pico all the way into the screen board's sockets, and make sure the screen board sits flush on the base's supports.` },
   { t: "Close the case",
     p: `Flip the base over and lower it, screen down, into the lid (still face down, buttons in). Line it up and press hard until it snaps. It's tight on purpose.`,
