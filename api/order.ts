@@ -6,7 +6,7 @@
 // A quote holds 10 minutes (catalog.ts QUOTE); then the order is 'expired'.
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
-import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, type Order } from "./_shop.js";
+import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, ipOf, tooMany, type Order } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
@@ -21,21 +21,24 @@ export async function POST(req: Request) {
   if (!env("SHOP_DATABASE_URL")) return oops("The shop isn't open yet.", 503);
   const sql = await db();
   const origin = new URL(req.url).origin;
-  return b?.id ? status(sql, b, origin) : create(sql, b, origin);
+  const ip = await ipOf(req);
+  return b?.id ? status(sql, b, origin, ip) : create(sql, b, origin, ip);
 }
 
-async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string) {
+async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string, ip: string) {
   const o = open();
   if (!cartOk(b?.cart)) return oops("Pick what you'd like.");
   if (typeof b.sealed !== "string" || !/^v1\.[A-Za-z0-9_.-]{40,4000}$/.test(b.sealed)) return oops("The address didn't come through sealed.");
   const cart = { wedgie: b.cart.wedgie, kit: b.cart.kit };
   await expireOld(sql);
+  const many = await tooMany(sql, ip);
+  if (many) return oops(many, 429);
   const lines = cartLines(cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
   const id = randomHex(6), token = randomHex(16), th = await sha256(token);
   if (b.pay === "card") {
     if (!o.card) return oops("Card checkout isn't open yet.", 503);
-    await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'card', ${b.sealed})`;
+    await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, ip) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'card', ${b.sealed}, ${ip})`;
     const s = await checkout({ id, cart, lines }, origin);
     await sql`update orders set stripe_session = ${s.id} where id = ${id}`;
     return json({ id, token, url: s.url });
@@ -49,7 +52,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     for (let i = 0; i < 8; i++) {
       const usdc = BigInt(cents) * 10_000n + BigInt(1 + Math.floor(Math.random() * 9999));
       try {
-        await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, chain, usdc, from_block) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'usdc', ${b.sealed}, ${chain}, ${usdc.toString()}, ${head})`;
+        await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, chain, usdc, from_block, ip) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'usdc', ${b.sealed}, ${chain}, ${usdc.toString()}, ${head}, ${ip})`;
         return json({ id, token });
       } catch (e: any) { if (!/orders_open_usdc/.test(e?.message || "")) throw e; }
     }
@@ -58,7 +61,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   return oops("Pay by card or USDC.");
 }
 
-async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string) {
+async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string, ip: string) {
   if (typeof b.id !== "string" || typeof b.token !== "string") return oops("Bad request.");
   const [o] = (await sql`select * from orders where id = ${b.id}`) as Order[];
   if (!o || !same(o.token_hash, await sha256(b.token))) return oops("No such order.", 404);
@@ -87,24 +90,26 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   }
   if (o.status === "new" && o.pay === "usdc" && late(o)) { await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`; o.status = "expired"; }
   if (b.renew === true && o.status === "expired") {
-    const r = await renew(sql, o, origin);
-    if (typeof r === "string") return oops(r, 503);
+    const r = await renew(sql, o, origin, ip);
+    if (typeof r === "string") return oops(r, 429);
     Object.assign(o, r.o); url = r.url; why = undefined;
   }
   return json({ ...publicView(o), url, why });
 }
 
 /** An expired order quoted again: today's price, a fresh 10 minutes, the same cart and sealed address. */
-async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: string): Promise<string | { o: Order; url?: string }> {
+async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: string, ip: string): Promise<string | { o: Order; url?: string }> {
   if (!o.sealed) return "That order can't be renewed: start over.";
   if (o.pay === "card" && (await endCard(sql, o)) === "paid") return { o: { ...o, status: "paid" } };   // its old checkout: paid after all, or ended
   await expireOld(sql);
+  const many = await tooMany(sql, ip);
+  if (many) return many;
   const lines = cartLines(o.cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
   if (o.pay === "card") {
     if (!open().card) return "Card checkout isn't open right now.";
     const s = await checkout({ id: o.id, cart: o.cart, lines }, origin);
-    const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, stripe_session = ${s.id}
+    const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, stripe_session = ${s.id}, ip = ${ip}
       where id = ${o.id} and status = 'expired' returning *`;
     return n ? { o: n as Order, url: s.url } : "Try again.";
   }
@@ -113,7 +118,7 @@ async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: stri
   for (let i = 0; i < 8; i++) {
     const usdc = BigInt(cents) * 10_000n + BigInt(1 + Math.floor(Math.random() * 9999));
     try {
-      const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, usdc = ${usdc.toString()}, from_block = ${head}
+      const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, usdc = ${usdc.toString()}, from_block = ${head}, ip = ${ip}
         where id = ${o.id} and status = 'expired' returning *`;
       return n ? { o: n as Order } : "Try again.";
     } catch (e: any) { if (!/orders_open_usdc/.test(e?.message || "")) throw e; }

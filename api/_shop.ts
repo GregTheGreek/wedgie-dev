@@ -2,6 +2,7 @@
 // an order's cart, how it was paid, and its address SEALED in the buyer's browser (src/shop/seal.ts) to
 // a key only the shipping computer has. This code can't read an address and never tries. Once a box
 // ships, the sealed address, the payer and the payment links are wiped; the rest goes 30 days later.
+// Also a keyed hash of the buyer's IP (ipOf), for OPEN_MAX; wiped after a day.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
@@ -37,6 +38,7 @@ export async function db() {
     await sql`create unique index if not exists orders_tx on orders (chain, tx) where tx is not null`;
     await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
     await sql`alter table orders add column if not exists from_block bigint`;   // usdc: the chain's head when it was made
+    await sql`alter table orders add column if not exists ip text`;   // ipOf: a hash, never the IP
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -88,6 +90,7 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
 export const late = (o: Pick<Order, "pay" | "created">) =>
   Date.now() > Date.parse(o.created) + (o.pay === "usdc" ? QUOTE + 120_000 : QUOTE);
 export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
+  await sql`update orders set ip = null where ip is not null and created < now() - interval '1 day'`;
   await sql`update orders set status = 'expired' where status = 'new' and pay = 'usdc'
     and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval`;
   const cards = await sql`select id, stripe_session from orders where status = 'new' and pay = 'card'
@@ -103,6 +106,19 @@ export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order
   }
   await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`;
   return "expired";
+}
+
+/** Open quotes raise everyone's price (extraNow), so one IP may hold only OPEN_MAX at a time. ipOf: the IP,
+ * hashed with a secret so the table can't be turned back into IPs. */
+export const OPEN_MAX = 2;
+export async function ipOf(req: Request) {
+  const ip = req.headers.get("x-real-ip") || (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "none";
+  return (await hmac(env("SHOP_ADMIN_TOKEN") || "wedgie", "ip:" + ip)).slice(0, 32);
+}
+export async function tooMany(sql: Awaited<ReturnType<typeof db>>, ip: string) {
+  const [r] = await sql`select count(*)::int as n from orders where ip = ${ip} and status = 'new'
+    and created > now() - ${`${QUOTE / 1000} seconds`}::interval`;
+  return r.n >= OPEN_MAX ? `You have ${OPEN_MAX} orders waiting to be paid. Pay one, or wait 10 minutes.` : "";
 }
 
 // ---- Stripe (its REST API; payment only: it is never sent an address) ----
