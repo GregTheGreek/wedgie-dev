@@ -5,6 +5,7 @@
 //   2. pay it from window.ethereum (an anvil account holding fork USDC): Paid once confirmed. The price went up
 //      when it was opened (open quotes count, so six orders can't each get the bottom price) and stays up
 //   3. plain transfers, wrong amounts: short (the page asks for the rest), then too much: paid
+//      ETH by mistake counts at Chainlink's price
 //   4. paid with the page closed: the shipping computer's list still finds it
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
 //   6. /api/admin refuses without the token; the deposits sweep to the Safe
@@ -132,6 +133,14 @@ await rpc("anvil_mine", ["0x3"]);
 await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
 ok(true, "two sends, too much in total: paid");
 
+// 3b: ETH by mistake (worth more than the price at Chainlink's rate): paid
+const ethOrder = await newOrder();
+const depE = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
+await rpc("eth_sendTransaction", [{ from: me, to: depE, value: "0x" + (10n ** 17n).toString(16) }]);   // 0.1 ETH
+await rpc("anvil_mine", ["0x3"]);
+await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
+ok(true, "ETH sent instead of USDC: counted at the ETH price, paid");
+
 // 4: paid after the buyer left the page: the shipping computer's list finds it
 const third = await newOrder();
 const dep3 = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
@@ -154,6 +163,7 @@ ok(await page.getByText("9400100000000000000001").isVisible(), "the buyer sees t
 ok(!py("list").includes(first), "shipped: gone from the list (sealed address wiped)");
 py("cancel", second);
 py("cancel", third);
+py("cancel", ethOrder);
 
 // 5b: sweep the deposits to the Safe: anyone may, nowhere else
 const D = await import("../src/shop/deposits.ts");

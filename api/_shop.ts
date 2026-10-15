@@ -174,7 +174,7 @@ export async function markPaid(sql: Awaited<ReturnType<typeof db>>, id: string, 
 
 // ---- USDC: read the chain ----
 // New orders: each has its own deposit address (src/shop/deposits.ts), so whatever lands there is that order's:
-// any amount, any wallet, any number of sends, late or not. Paid once it holds the price. The old orders
+// any amount, any wallet, any number of sends, late or not, USDC or ETH, on any of the shop's chains. Paid once it holds the price. The old orders
 // (deposit null) were paid to the Safe with an exact amount: usdcPaid / usdcFind below.
 let rpcId = 0;
 export async function rpc(chain: number, method: string, params: unknown[]) {
@@ -190,14 +190,29 @@ export async function rpc(chain: number, method: string, params: unknown[]) {
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const topicOf = (a: string) => "0x" + a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 
-/** What this order's deposit address holds, a few blocks back (PAY_CHAINS confirm). Swept funds are gone
- * from it, but an order is marked paid before anything is swept. */
+/** What this order's deposit address holds, in USDC units (6 decimals), on every chain the shop reads: the
+ * address is the same on all of them, so the wrong chain still counts. USDC dollar for dollar; ETH at
+ * Chainlink's ETH/USD on Base (skipped if that's over an hour old). Read a few blocks back (PAY_CHAINS confirm).
+ * Swept funds are gone from it, but an order is marked paid before anything is swept. */
+const ETH_USD = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70";   // Chainlink ETH/USD on Base, 8 decimals
 export async function usdcGot(o: Order): Promise<bigint> {
-  const c = PAY_CHAINS[o.chain!];
-  const head = BigInt(await rpc(o.chain!, "eth_blockNumber", []));
-  const at = "0x" + (head - BigInt(c.confirm) + 1n).toString(16);
-  const data = "0x70a08231" + o.deposit!.toLowerCase().replace(/^0x/, "").padStart(64, "0");   // balanceOf
-  return BigInt(await rpc(o.chain!, "eth_call", [{ to: c.usdc, data }, at]));
+  const who = o.deposit!.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+  const chains = Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c));
+  const per = await Promise.all(chains.map(async (chain) => {
+    const c = PAY_CHAINS[chain];
+    const head = BigInt(await rpc(chain, "eth_blockNumber", []));
+    const at = "0x" + (head - BigInt(c.confirm) + 1n).toString(16);
+    const [usdc, wei] = await Promise.all([rpc(chain, "eth_call", [{ to: c.usdc, data: "0x70a08231" + who }, at]), rpc(chain, "eth_getBalance", ["0x" + who.slice(24), at])]);
+    return { usdc: BigInt(usdc), wei: BigInt(wei) };
+  }).map((p) => p.catch(() => ({ usdc: 0n, wei: 0n }))));   // a chain that can't be read counts 0 this time
+  let got = per.reduce((t, x) => t + x.usdc, 0n);
+  const wei = per.reduce((t, x) => t + x.wei, 0n);
+  if (wei > 0n && env("SHOP_RPC_8453")) {
+    const r = (await rpc(8453, "eth_call", [{ to: ETH_USD, data: "0xfeaf968c" }, "latest"])) as string;   // latestRoundData
+    const price = BigInt("0x" + r.slice(2 + 64, 2 + 128)), updated = Number(BigInt("0x" + r.slice(2 + 192, 2 + 256)));
+    if (price > 0n && Date.now() / 1000 - updated < 3600) got += wei * price / 10n ** 20n;   // wei * usd(1e8) -> 1e6
+  }
+  return got;
 }
 /** A deposit order that holds its price: paid. Returns whether it is now. */
 export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint }> {

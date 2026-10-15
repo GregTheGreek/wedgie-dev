@@ -21,6 +21,10 @@ Stripe Checkout (`api/_shop.ts`). Stripe never gets a shipping address.
 Every order gets **its own deposit address**. Whatever lands there is that order's: any amount, any
 wallet, any number of sends, late or not.
 
+The address is the same on Base, Ethereum, Arbitrum and Optimism, and all four count (`usdcGot`): USDC
+on the wrong chain is fine. ETH sent by mistake counts at Chainlink's ETH/USD on Base (ignored if that
+feed is over an hour old).
+
 - Paid once the address holds the price (read a few blocks back: `PAY_CHAINS` `confirm`).
 - Short: the page says "Got X. Send Y more."
 - Too much: paid.
@@ -36,6 +40,7 @@ The addresses are CREATE2 (`src/shop/deposits.ts`), so nothing is deployed per o
 Base, Ethereum, Arbitrum and Optimism (deterministic deployer, salt 0). Its `shop` is wedgie.eth
 (`0xf5d3C7F2fACeAAc12A75d66e3BE4365A21d0d43C`).
 
+- Sweep on each chain the money is on.
 - `sweep(salt, token)`: deploys the order's Deposit if needed and sends all of that token to wedgie.eth.
   `token = 0` sweeps ETH. Anyone may call it; the money can't go anywhere else.
 - `sweepMany(salts, token)`: the same for many orders.
