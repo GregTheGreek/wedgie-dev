@@ -55,7 +55,7 @@ const STEPS: Step[] = [
     d: "08", ph: ["08-black-red-guide", "08-black-red-in-header", "08-black-red-taped"] },
   { t: "Header ready",
     p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
-    d: "09", ph: ["09-header-ready"] },
+    d: "09h", ph: ["09-header-ready"] },
   { t: "How the plug fits the chip",
     p: `The plug goes into the Trust M chip board. Only 4 wires. Top to bottom: <b>white, yellow, black, red</b>.`,
     d: "02", ph: ["02-trust-m-plug"] },
