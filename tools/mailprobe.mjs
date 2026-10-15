@@ -2,9 +2,11 @@
 // in-memory Postgres (tools/neonlite.mjs), a fake chain head, and SHOP_MAIL_FILE catching each mail.
 //   1. an order needs an email; the database never holds it in clear
 //   2. paid: one "paid" mail, with the order's link
-//   3. login: a code mail; wrong code refused; right code gives back the order's token; a 2nd send waits a minute
+//   3. sign in: a mail with a green button to /signin#<token>; the link gives a session and the order's token, once;
+//      the session lists the orders; a 2nd send waits a minute; signed out, the session is dead
 //   4. an email with no orders: same answer, no mail
 //   5. shipped: a mail with the tracking number; the locked email is wiped
+//   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out forgets all
 // Run: node tools/mailprobe.mjs
 import { createServer } from "vite";
 import { createServer as http } from "node:http";
@@ -41,15 +43,19 @@ const paid = mails().filter((m) => /paid/.test(m.subject));
 ok(paid.length === 1 && paid[0].to === EMAIL && paid[0].text.includes(`/order/${o.id}#${o.token}`), "one paid mail, with the order's link");
 
 // 3
-ok((await call(login.POST, { email: "buyer@example.com " })).ok, "login: asks for a code (any case, spaces)");
-const codeMail = mails().find((m) => /code/.test(m.subject));
-const code = codeMail?.subject.match(/\d{6}/)?.[0];
-ok(code && codeMail.to === "buyer@example.com", "a code mail");
-ok((await call(login.POST, { email: EMAIL, code: code === "000000" ? "111111" : "000000" })).error === "Wrong code.", "a wrong code is refused");
-const got = await call(login.POST, { email: EMAIL, code });
-ok(got.orders?.length === 1 && got.orders[0].id === o.id && got.orders[0].token === o.token, "the right code gives back the order and its token");
-ok((await call(login.POST, { email: EMAIL, code })).status === 400, "a used code doesn't work again");
+ok((await call(login.POST, { email: "buyer@example.com " })).ok, "sign in: asks for a link (any case, spaces)");
+const sm1 = mails().find((m) => /Sign in/.test(m.subject));
+const link = sm1?.html.match(/href="https:\/\/wedgie\.dev\/signin#([0-9a-f]{32})"/)?.[1];
+ok(link && sm1.to === "buyer@example.com" && /background:#22c452/.test(sm1.html) && sm1.text.includes("/signin#" + link), "a sign-in mail with a green button");
+ok((await call(login.POST, { link: "0".repeat(32) })).status === 400, "a made-up link is refused");
+const got = await call(login.POST, { link });
+ok(got.session && got.until > Date.now() + 2 * 86400e3 && got.orders?.length === 1 && got.orders[0].id === o.id && got.orders[0].token === o.token,
+  "the link gives a session (over 48 hours) and the order with its token");
+ok((await call(login.POST, { link })).status === 400, "a used link doesn't work again");
+ok((await call(login.POST, { session: got.session })).orders?.[0]?.id === o.id, "the session lists the orders");
 ok((await call(login.POST, { email: EMAIL })).status === 429, "a second send within a minute waits");
+await call(login.POST, { signout: got.session });
+ok((await call(login.POST, { session: got.session })).status === 401, "signed out: the session is dead");
 
 // 4
 const before = mails().length;
@@ -63,6 +69,47 @@ ok(shipped.mailed && sm?.to === EMAIL && sm.text.includes("940010000000000000000
 const [after] = await sql`select email_enc, email_hash from orders where id = ${o.id}`;
 ok(!after.email_enc && after.email_hash, "shipped: the locked email is wiped (the hash stays for login)");
 
+// 6: the real pages under vite, in a browser
+await vs.close();
+const { spawn } = await import("node:child_process");
+const { chromium } = await import("playwright-core");
+const { readdirSync } = await import("node:fs");
+const { homedir } = await import("node:os");
+const PORT = 5199, SITE = `http://localhost:${PORT}`;
+const vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { stdio: "ignore", env: { ...process.env, SHOP_DATABASE_URL_DEV: "pglite" } });
+process.on("exit", () => vite.kill());
+for (let i = 0; ; i++) { try { if ((await fetch(SITE + "/api/order")).ok) break; } catch {} if (i > 100) throw new Error("vite didn't start"); await new Promise((r) => setTimeout(r, 300)); }
+const post = async (u, b) => (await fetch(SITE + u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) })).json();
+const o2 = await post("/api/order", { ...base, email: "tabs@example.com" });
+ok(o2.id, "an order on the page's server");
+const cache = homedir() + "/Library/Caches/ms-playwright";
+const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
+const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell` });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
+const A = await ctx.newPage();
+A.on("pageerror", (e) => console.error("page:", e.message));
+await A.goto(SITE + "/");
+ok(await A.locator(".signin-btn").innerText() === "Sign in", "the header says Sign in");
+await A.locator(".signin-btn").click();
+await A.waitForURL(/\/signin$/);
+await A.fill("[name=email]", "tabs@example.com");
+await A.locator("#o-go").click();
+await A.getByText("Check your email").waitFor();
+const href = mails().filter((m) => m.to === "tabs@example.com" && /Sign in/.test(m.subject)).pop().html.match(/href="http[^"]*?(\/signin#[0-9a-f]{32})"/)[1];
+const B = await ctx.newPage();
+await B.goto(SITE + href);
+await B.waitForURL(/\/orders$/);
+await B.locator(`[data-id="${o2.id}"]`).waitFor();
+ok(true, "the link signs in tab B and lists the order");
+await A.waitForURL(/\/orders$/, { timeout: 5000 });
+ok(await A.locator(`[data-id="${o2.id}"]`).count() === 1 && await A.locator(".orders-btn .lbl").innerText() === "Orders", "tab A signed in by itself; the header says Orders");
+await A.goto(SITE + "/signin");
+ok(await A.inputValue("[name=email]").catch(() => null) === null && /\/orders$/.test(A.url()), "signed in, /signin goes to your orders");
+await A.locator("#o-out").click();
+await A.waitForURL(SITE + "/");
+ok(await A.evaluate(() => ["wedgie-session", "wedgie-orders", "wedgie-email"].every((k) => !localStorage.getItem(k))), "Sign out forgets everything here");
+await browser.close();
+
 console.log("mailprobe: all passed");
-await vs.close(); chain.close();
+chain.close();
 process.exit(0);

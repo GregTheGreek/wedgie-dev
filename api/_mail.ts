@@ -1,4 +1,5 @@
-// Email from wedgie@buidlguidl.com (Gmail SMTP, an app password): login codes, paid, shipped. Plain text only.
+// Email from wedgie@buidlguidl.com (Gmail SMTP, an app password): sign-in links, paid, shipped. Text + a little
+// HTML: the lines and one green button like the site's.
 // A buyer's email is kept two ways, never in clear: emailHash (a keyed hash, to find their orders at login; goes
 // with the order) and lock()ed (to send paid and shipped; wiped when it ships). Order tokens are tokenOf(id), so
 // a login can hand them back. All three need SHOP_MAIL_KEY: change it and old orders can't be found by email.
@@ -28,23 +29,33 @@ export async function unlock(b64: string) {
 }
 
 let smtp: ReturnType<typeof nodemailer.createTransport> | null = null;
-export async function send(to: string, subject: string, text: string) {
-  if (env("SHOP_MAIL_FILE")) { appendFileSync(env("SHOP_MAIL_FILE"), JSON.stringify({ to, subject, text }) + "\n"); return; }
+/** lines: plain paragraphs. go: the green button (and the link, in the text version). */
+export async function send(to: string, subject: string, lines: string[], go: { text: string; href: string }) {
+  const text = [...lines, `${go.text}: ${go.href}`].join("\n\n") + "\n";
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+  const html = `<div style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:17px;line-height:1.5;color:#1a1b1a;max-width:480px;margin:0 auto;padding:24px 16px">
+${lines.map((l) => `<p style="margin:0 0 16px">${esc(l).replace(/\n/g, "<br>")}</p>`).join("")}
+<p style="margin:28px 0"><a href="${esc(go.href)}" style="display:inline-block;background:#22c452;background-image:linear-gradient(#3fd56a,#168c34);color:#ffffff;font-weight:800;font-size:18px;text-decoration:none;padding:16px 30px;border-radius:999px;border-bottom:3px solid #0f6e28">${esc(go.text)}</a></p>
+<p style="margin:0;color:#787b78;font-size:13px">wedgie.dev</p></div>`;
+  if (env("SHOP_MAIL_FILE")) { appendFileSync(env("SHOP_MAIL_FILE"), JSON.stringify({ to, subject, text, html }) + "\n"); return; }
   if (!env("SHOP_MAIL_USER") || !env("SHOP_MAIL_PASS")) throw new Error("Email isn't set up yet.");
   smtp ||= nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: env("SHOP_MAIL_USER"), pass: env("SHOP_MAIL_PASS") } });
-  await smtp.sendMail({ from: `wedgie <${env("SHOP_MAIL_USER")}>`, to, subject, text });
+  await smtp.sendMail({ from: `wedgie <${env("SHOP_MAIL_USER")}>`, to, subject, text, html });
 }
 
 const items = (lines: Line[] | null) => (lines || []).map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ");
 const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
 const link = async (origin: string, id: string) => `${origin}/order/${id}#${await tokenOf(id)}`;
 
-export const codeMail = (to: string, code: string) =>
-  send(to, `Your wedgie code: ${code}`, `${code}\n\nType it on wedgie.dev to see your orders. It works for 10 minutes.\n`);
+export const signinMail = (to: string, href: string) =>
+  send(to, "Sign in to wedgie.dev", ["Tap to sign in and see your orders. The link works once, for 15 minutes.", "Didn't ask for this? Ignore it."],
+    { text: "Sign in to wedgie.dev", href });
 export const paidMail = async (to: string, o: { id: string; lines: Line[] | null; cents: number }, origin: string) =>
-  send(to, `wedgie order ${o.id}: paid`, `Paid, thank you.\n\n${items(o.lines)} · ${usd(o.cents)} shipped\n${SHIPS} We'll email the tracking number.\n\nYour order: ${await link(origin, o.id)}\n`);
+  send(to, `wedgie order ${o.id}: paid`, ["Paid, thank you.", `${items(o.lines)} · ${usd(o.cents)} shipped`, `${SHIPS} We'll email the tracking number.`],
+    { text: "See your order", href: await link(origin, o.id) });
 export const shippedMail = async (to: string, id: string, tracking: string, origin: string) =>
-  send(to, `wedgie order ${id}: shipped`, `Shipped.\n\nUSPS tracking: ${tracking}\nhttps://tools.usps.com/go/TrackConfirmAction?tLabels=${tracking}\n\nYour order: ${await link(origin, id)}\n`);
+  send(to, `wedgie order ${id}: shipped`, ["Shipped.", `USPS tracking: ${tracking}`],
+    { text: "Track it", href: `https://tools.usps.com/go/TrackConfirmAction?tLabels=${tracking}` });
 
 /** "Paid" goes out once per order (paid_mailed), if it has an email. Never throws: a failed send is tried again next time. */
 export async function mailPaid(sql: Awaited<ReturnType<typeof db>>, id: string, origin: string) {

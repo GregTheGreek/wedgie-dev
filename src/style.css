@@ -246,6 +246,8 @@ html, body { overflow-x: clip; }
 .orders-btn:active { transform: translateY(2px); }
 .orders-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.08); border-radius: 999px; padding: 1px 8px; }
 .orders-btn ~ #s-me { margin-left: 0; }
+.signin-btn { padding: 0 18px; }
+.orders-who { margin: 0; text-align: center; }
 @media (max-width: 560px) { .orders-btn .lbl { display: none; } .orders-btn { padding: 0 13px; } }
 @media (max-width: 480px) { .top:has(.orders-btn) .brand .tag { display: none; } }
 .orders-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; text-decoration: none; color: inherit; }

@@ -37,51 +37,102 @@ async function api(body?: unknown, url = "/api/order") {
 
 export function order(main: HTMLElement) {
   const path = location.pathname.replace(/\/+$/, "");
-  const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders";
+  const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders", signin = path === "/signin";
   main.innerHTML = `
   <section class="test-page safe-page order-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>${all ? "Your orders" : id ? "Your order" : "Order"}</h1>
+    <h1>${signin ? "Sign in" : all ? "Your orders" : id ? "Your order" : "Order"}</h1>
     <div id="o-body" class="order-stack"></div>
     <p class="safe-msg" id="o-msg" hidden></p>
   </section>`;
   const body = main.querySelector<HTMLElement>("#o-body")!;
   const msgEl = main.querySelector<HTMLElement>("#o-msg")!;
   const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); };
-  if (all) list(body, say); else if (id) status(id, body, say); else form(body, say);
+  if (signin) signIn(body, say); else if (all) list(body, say); else if (id) status(id, body, say); else form(body, say);
 }
 
-// ---- every order this browser made, newest first ----
+// ---- signed in (api/login.ts): a session good till `until`, and the last email used here (fills the box in) ----
+const SESSION = "wedgie-session", LAST = "wedgie-email";
+export const session = (): { token: string; until: number } | null => {
+  try { const v = JSON.parse(localStorage.getItem(SESSION) || "null"); return v?.until > Date.now() ? v : null; } catch { return null; }
+};
+const lastEmail = () => { try { return localStorage.getItem(LAST) || ""; } catch { return ""; } };
+type Got = { id: string; token: string; at: number };
+const keep = (orders: Got[]) => orders.forEach((o) => remember(o.id, { token: o.token, at: o.at }));
+
+// /signin: your email, then "check your email". The link in it opens /signin#<token> (often another tab): that tab
+// signs in, and this one sees the session land in localStorage and follows. Only in the same browser, on purpose:
+// a link opened anywhere else can't sign in a tab that someone else is holding open.
+function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
+  const link = location.hash.slice(1);
+  if (/^[0-9a-f]{32}$/.test(link)) {
+    history.replaceState(null, "", "/signin");
+    box.innerHTML = `<div class="safe-box recess"><p class="fine">Signing in.</p></div>`;
+    login({ link }).then((r) => {
+      keep(r.orders);
+      localStorage.setItem(SESSION, JSON.stringify({ token: r.session, until: r.until }));
+      location.replace("/orders");
+    }, (e) => { say(msgOf(e), true); ask(); });
+    return;
+  }
+  if (session()) return location.replace("/orders");
+  ask();
+
+  function ask() {
+    box.innerHTML = `<div class="safe-box recess"><form class="order-fields" id="o-find">
+        <label class="wide">Email <input name="email" type="email" autocomplete="email" maxlength="100" required value="${esc(lastEmail())}"></label></form>
+      <p><button class="btn btn-green" id="o-go">Sign in</button></p></div>`;
+    const f = box.querySelector<HTMLFormElement>("#o-find")!, go = box.querySelector<HTMLButtonElement>("#o-go")!;
+    const email = f.querySelector<HTMLInputElement>("[name=email]")!;
+    if (!email.value) email.focus();
+    const send = async () => {
+      const e = email.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return say("Fill in your email.", true);
+      go.disabled = true;
+      try {
+        await login({ email: e });
+        localStorage.setItem(LAST, e);
+        say("");
+        sent(e);
+      } catch (err) { say(msgOf(err), true); go.disabled = false; }
+    };
+    go.onclick = send;
+    f.onsubmit = (e) => { e.preventDefault(); send(); };
+  }
+  function sent(e: string) {
+    box.innerHTML = `<div class="safe-box recess order-sent"><h2>Check your email</h2><p><b>${esc(e)}</b></p>
+      <p>Tap the link in it. This page signs in by itself.</p>
+      <p class="fine">Nothing there? Check spam. We only email addresses that have ordered.</p>
+      <p><button class="btn btn-sm" id="o-again">Use a different email</button></p></div>`;
+    box.querySelector<HTMLButtonElement>("#o-again")!.onclick = () => { clearInterval(t); ask(); };
+    const t = setInterval(() => { if (session()) { clearInterval(t); location.replace("/orders"); } }, 1000);
+    addEventListener("storage", (ev) => { if (ev.key === SESSION && session()) location.replace("/orders"); });
+  }
+}
+
+// /orders: every order this browser knows, newest first; signed in, every order on your email too, and Sign out.
 const STATUS: Record<string, string> = { new: "Not paid", expired: "Time ran out", paid: "Paid", shipped: "Shipped", canceled: "Canceled" };
-function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
+async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
+  const s = session();
+  if (s) {
+    try { keep((await login({ session: s.token })).orders); }
+    catch (e) { if (/Signed out/.test(msgOf(e))) { localStorage.removeItem(SESSION); return location.reload(); } say(msgOf(e), true); }
+  }
   const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
-  box.innerHTML = yours.map(([i]) => `<a class="safe-box recess orders-row" href="/order/${esc(i)}" data-id="${esc(i)}">
-    <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("") + `
-    <div class="safe-box recess" id="o-login"><h2>${yours.length ? "Ordered somewhere else?" : "Find your orders"}</h2>
-      <p class="fine">We'll email you a code.</p>
-      <form class="order-fields" id="o-find"><label class="wide">Email <input name="email" type="email" autocomplete="email" maxlength="100" required></label>
-        <label class="wide" hidden>Code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label></form>
-      <p><button class="btn btn-green" id="o-go">Email me a code</button></p></div>`;
-  const f = box.querySelector<HTMLFormElement>("#o-find")!, go = box.querySelector<HTMLButtonElement>("#o-go")!;
-  const email = f.querySelector<HTMLInputElement>("[name=email]")!, code = f.querySelector<HTMLInputElement>("[name=code]")!;
-  let sent = false;
-  const step = async () => {
-    go.disabled = true;
-    try {
-      if (!sent) {
-        await login({ email: email.value.trim() });
-        sent = true; code.parentElement!.hidden = false; go.textContent = "Open my orders"; code.focus();
-        say("If that email has orders, a code is on its way.");
-      } else {
-        const r = await login({ email: email.value.trim(), code: code.value });
-        r.orders.forEach((o: { id: string; token: string; at: number }) => remember(o.id, { token: o.token, at: o.at }));
-        location.reload();     // the header's Orders button too
-      }
-    } catch (e) { say(msgOf(e), true); }
-    go.disabled = false;
+  if (!s && !yours.length) return location.replace("/signin");
+  box.innerHTML = (s && lastEmail() ? `<p class="fine orders-who">Signed in as <b>${esc(lastEmail())}</b></p>` : "")
+    + (yours.length ? "" : `<div class="safe-box recess"><p>No orders yet.</p><p><a class="btn btn-green" href="/order">Order a wedgie</a></p></div>`)
+    + yours.map(([i]) => `<a class="safe-box recess orders-row" href="/order/${esc(i)}" data-id="${esc(i)}">
+    <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("")
+    + (s ? `<p><button class="btn btn-sm btn-red" id="o-out">Sign out</button></p>`
+      : `<div class="safe-box recess"><p>Sign in to see orders from other devices.</p><p><a class="btn btn-green" href="/signin">Sign in</a></p></div>`);
+  const out = box.querySelector<HTMLButtonElement>("#o-out");
+  if (out) out.onclick = async () => {
+    out.disabled = true;
+    await login({ signout: s!.token }).catch(() => {});
+    [SESSION, MEM, LAST].forEach((k) => localStorage.removeItem(k));     // a public computer keeps nothing
+    location.replace("/");
   };
-  go.onclick = step;
-  f.onsubmit = (e) => { e.preventDefault(); step(); };
   yours.forEach(([i, o]) => api({ id: i, token: o.token }).then((v: View) => {
     const row = box.querySelector<HTMLElement>(`[data-id="${i}"]`)!;
     const items = v.lines ? v.lines.map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ") : "";
@@ -118,7 +169,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
         <label>State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
         <label>ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
-        <label class="wide">Email <span class="fine">(for the tracking number; never shared)</span> <input name="email" type="email" autocomplete="email" maxlength="100"></label>
+        <label class="wide">Email <span class="fine">(for the tracking number; never shared)</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"></label>
       </form>
     </div>
     <div class="safe-box recess" id="o-pay">
@@ -128,7 +179,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         on <select id="o-chain">${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></p>
       <p class="fine" id="o-open">Checking the shop.</p>
     </div>
-    <p class="fine"><a href="/orders">Ordered before? Find your orders</a></p>`;
+    <p class="fine"><a href="/signin">Ordered before? Sign in</a></p>`;
 
   let extra = 0;     // cents over list right now (catalog.ts); the server works it out again at checkout
   const paint = () => {
@@ -183,6 +234,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       say(pay === "card" ? "Opening checkout." : "Making your order.");
       const r = await api({ cart, sealed, email: s.email, pay, chain: Number(box.querySelector<HTMLSelectElement>("#o-chain")!.value) });
       remember(r.id, { token: r.token, at: Date.now() });
+      localStorage.setItem(LAST, s.email);
       location.href = r.url || `/order/${r.id}`;
     } catch (e) { say(msgOf(e), true); b.disabled = false; }
   };

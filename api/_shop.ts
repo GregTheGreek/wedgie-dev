@@ -43,9 +43,12 @@ export async function db() {
     await sql`alter table orders add column if not exists email_enc text`;    // _mail.ts lock: the email, for paid + shipped; wiped when it ships
     await sql`alter table orders add column if not exists paid_mailed timestamptz`;
     await sql`create index if not exists orders_email on orders (email_hash) where email_hash is not null`;
-    await sql`create table if not exists logins (     -- a login code sent to an email (api/login.ts)
-      email_hash text primary key, code_hash text not null, expires timestamptz not null, tries int not null default 0,
-      sent_at timestamptz not null, hour_start timestamptz not null, sends int not null default 1)`;
+    await sql`drop table if exists logins`;   // the old 6-digit codes
+    await sql`create table if not exists links (      -- a sign-in link emailed (api/login.ts); used once, 15 minutes
+      token_hash text primary key, email_hash text not null, created timestamptz not null default now(), used_at timestamptz)`;
+    await sql`create index if not exists links_email on links (email_hash, created)`;
+    await sql`create table if not exists sessions (   -- a signed-in browser (api/login.ts)
+      token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;

@@ -139,6 +139,10 @@
     {
       "source": "/orders",
       "destination": "/index.html"
+    },
+    {
+      "source": "/signin",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false
