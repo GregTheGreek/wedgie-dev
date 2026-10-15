@@ -713,7 +713,7 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .o2 .stx-ok { opacity: var(--s2); }
 .stx-wait { background: #f1f1ee; color: var(--muted); opacity: var(--s3); }
 .o3 { opacity: calc(1 - var(--s3) * .45); }
-.stx-done { margin-top: 10px; text-align: center; font-weight: 900; letter-spacing: .04em; color: #fff; border-radius: 12px; padding: 10px;
-  background: var(--green-fill); opacity: calc(.15 + var(--s3) * .85); filter: grayscale(calc(1 - var(--s3))); }
+.stx-done { margin-top: 10px; text-align: center; font-weight: 900; letter-spacing: .04em; color: var(--mint-d); border-radius: 12px; padding: 8px;
+  border: 2px solid var(--mint); background: #f3fbf5; opacity: calc(.15 + var(--s3) * .85); filter: grayscale(calc(1 - var(--s3))); }   /* a status, not a button */
 @media (max-width: 860px) { .signer { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .stx { --p: 1 !important; } }
