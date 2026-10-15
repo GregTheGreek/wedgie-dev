@@ -2,8 +2,14 @@
 import { place3D, pageShown } from "../ui/place3d";
 import { ITEMS, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
+import { blo } from "blo";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
+// The Safe section's drawing: Safe's mark (from safe-global/safe-wallet-monorepo), two made-up owners, a key that turns into a wedgie.
+const SAFE_MARK = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M21.757 11.998h-2.485c-.742 0-1.343.579-1.343 1.293v3.47c0 .714-.602 1.293-1.344 1.293H6.699c-.743 0-1.344.578-1.344 1.292v2.391c0 .714.601 1.293 1.344 1.293h10.458c.742 0 1.335-.579 1.335-1.293V19.82c0-.714.602-1.22 1.344-1.22h1.92c.743 0 1.344-.58 1.344-1.293v-4.03c0-.714-.601-1.278-1.343-1.278ZM5.355 7.249c0-.714.6-1.293 1.343-1.293h9.88c.743 0 1.344-.579 1.344-1.293v-2.39c0-.714-.601-1.293-1.344-1.293H6.125c-.742 0-1.343.579-1.343 1.293v1.842c0 .714-.602 1.292-1.344 1.292H1.526C.784 5.407.182 5.986.182 6.7v4.034c0 .714.604 1.264 1.346 1.264h2.485c.743 0 1.344-.579 1.344-1.293L5.355 7.25ZM10.472 9.485h2.387c.778 0 1.409.608 1.409 1.356v2.296c0 .748-.632 1.356-1.41 1.356h-2.386c-.778 0-1.409-.608-1.409-1.356v-2.296c0-.749.632-1.356 1.409-1.356Z"/></svg>`;
+const OWNERS = ["0x3f6a1d2c8b4e7f90a1b2c3d4e5f60718293a4b5c", "", "0x9c41e07b5d2a8f3e6c1b0a9d8e7f6a5b4c3d2e1f"] as const;
+const KEY_SVG = `<svg class="stx-key" viewBox="0 0 40 40"><circle cx="13" cy="20" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><path d="M20 20h15v6M30 20v5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>`;
+const WEDGIE_SVG = `<svg class="stx-wedgie" viewBox="-64 -28 128 56"><rect x="-62" y="-26" width="124" height="52" rx="14" fill="#2a2b2a"/><rect x="-60" y="-26" width="120" height="48" rx="13" fill="#fefefe" stroke="#d6d6d1"/><rect x="-22" y="-20" width="44" height="36" rx="3" fill="#1a1b1a"/><rect x="-19" y="-17" width="38" height="30" fill="#fefefe"/><rect x="-19" y="-17" width="38" height="2.5" fill="#22c452"/><rect x="-19" y="-14.5" width="38" height="2" fill="#a9aaab"/><rect x="-19" y="-12.5" width="38" height="2.5" fill="#e3312c"/><path class="stx-check" pathLength="1" d="M-8 1 L-2 7 L9 -5" fill="none" stroke="#22c452" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="-41" cy="-2" r="8" fill="#a9aaab"/><circle cx="-41" cy="-2" r="5" fill="#8a8b8c"/><circle cx="35" cy="-10" r="4.2" fill="#a9aaab"/><circle cx="35" cy="6" r="4.2" fill="#a9aaab"/><circle cx="47" cy="-10" r="4.2" fill="#22c452"/><circle cx="47" cy="6" r="4.2" fill="#e3312c"/></svg>`;
 const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
 
 /** Returns once the hero wedgie is up (the loader waits for it). */
@@ -74,43 +80,29 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card wide signer">
       <div class="signer-copy">
         <span class="kicker">Safe signer</span>
-        <h2>Sign for a Safe.</h2>
+        <h2>Sign on a Gnosis Safe.</h2>
         <p>A wedgie can sign for a Safe multisig with Safe's own audited contracts. The key never leaves the chip, and nothing signs until you press the green button.</p>
         <div class="row"><a class="btn btn-sm" href="/safe">Use it with a Safe →</a></div>
       </div>
-      <div class="deed" aria-hidden="true">
-        <svg viewBox="0 0 400 470">
-          <defs><pattern id="deed-rule" width="400" height="22" patternUnits="userSpaceOnUse"><path d="M0 21.5h400" stroke="#d9e4ea" stroke-width="1"/></pattern></defs>
-          <rect class="deed-paper" x="8" y="8" width="384" height="454" rx="6"/>
-          <rect x="24" y="150" width="352" height="296" fill="url(#deed-rule)"/>
-          <rect x="20" y="20" width="360" height="430" rx="3" fill="none" stroke="#c9c3ae" stroke-width="1.5"/>
-          <g class="deed-owl" transform="translate(200 62)">
-            <circle r="34" fill="none" stroke="#168c34" stroke-width="2.5"/><circle r="29" fill="none" stroke="#168c34" stroke-width="1" stroke-dasharray="2 3"/>
-            <path d="M-17 -16 L-11 -8 L0 -11 L11 -8 L17 -16 L18 6 Q16 22 0 24 Q-16 22 -18 6 Z" fill="#168c34"/>
-            <circle cx="-7.5" cy="0" r="6.5" fill="#fefefe"/><circle cx="7.5" cy="0" r="6.5" fill="#fefefe"/>
-            <circle cx="-7" cy="0.5" r="2.8" fill="#1a1b1a"/><circle cx="7" cy="0.5" r="2.8" fill="#1a1b1a"/>
-            <path d="M-3 7 L3 7 L0 12 Z" fill="#f2b632"/>
-          </g>
-          <text class="deed-t" x="200" y="122">Safe Contract</text>
-          <text class="deed-s" x="200" y="142">2 of 3 owners must sign</text>
-          <text class="deed-l" x="40" y="196">Send 1,000 USDC to vitalik.eth</text>
-          <g transform="translate(0 260)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 1</text>
-            <path class="deed-ink" pathLength="1" d="M52 -6 C60 -40 72 -40 70 -10 S80 -2 90 -22 C96 -34 100 -14 108 -12 C118 -10 120 -30 132 -26 C142 -22 130 -4 148 -8 C162 -12 170 -28 182 -20 C190 -14 196 -10 230 -18"/></g>
-          <g transform="translate(0 340)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 2</text>
-            <g class="deed-key" transform="translate(110 -24)"><circle r="13" fill="none" stroke="#b8902a" stroke-width="5"/><path d="M13 0h46v12M49 0v9" fill="none" stroke="#b8902a" stroke-width="5" stroke-linecap="round"/></g>
-            <g class="deed-wedgie" transform="translate(150 -24)">
-              <rect x="-62" y="-26" width="124" height="52" rx="14" fill="#2a2b2a"/><rect x="-60" y="-26" width="120" height="48" rx="13" fill="#fefefe" stroke="#d6d6d1"/>
-              <rect x="-22" y="-20" width="44" height="36" rx="3" fill="#1a1b1a"/><rect x="-19" y="-17" width="38" height="30" fill="#fefefe"/>
-              <rect x="-19" y="-17" width="38" height="2.5" fill="#22c452"/><rect x="-19" y="-14.5" width="38" height="2" fill="#a9aaab"/><rect x="-19" y="-12.5" width="38" height="2.5" fill="#e3312c"/>
-              <path class="deed-check" pathLength="1" d="M-8 1 L-2 7 L9 -5" fill="none" stroke="#22c452" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="-41" cy="-2" r="8" fill="#a9aaab"/><circle cx="-41" cy="-2" r="5" fill="#8a8b8c"/>
-              <circle cx="35" cy="-10" r="4.2" fill="#a9aaab"/><circle cx="35" cy="6" r="4.2" fill="#a9aaab"/>
-              <circle cx="47" cy="-10" r="4.2" fill="#22c452"/><circle cx="47" cy="6" r="4.2" fill="#e3312c"/>
-            </g>
-            <text class="deed-by" x="228" y="-18">signed on a wedgie</text></g>
-          <g transform="translate(0 420)"><path d="M40 0h320" class="deed-line"/><text class="deed-o" x="40" y="18">Owner 3</text></g>
-          <g class="deed-stamp" transform="translate(296 402) rotate(-12)"><rect x="-62" y="-22" width="124" height="44" rx="6" fill="none" stroke="#22c452" stroke-width="4"/><text x="0" y="8">EXECUTED</text></g>
-        </svg>
+      <div class="stx" aria-hidden="true">
+        <div class="stx-head">
+          <i class="stx-logo">${SAFE_MARK}</i>
+          <div><b>Treasury</b><span class="stx-mono">base:0x5afe…C0DE</span></div>
+          <span class="stx-chain">Base</span>
+        </div>
+        <div class="stx-tx">
+          <span class="stx-fn">execTransaction</span>
+          <b>Send 1,000 USDC</b>
+          <span class="stx-mono">to vitalik.eth · nonce 42</span>
+        </div>
+        <div class="stx-conf"><span>Confirmations</span><b class="stx-n"><i class="n0">0</i><i class="n1">1</i><i class="n2">2</i> of 2</b></div>
+        <div class="stx-meter"><i></i></div>
+        <ol class="stx-owners">
+          <li class="o1"><img class="stx-av" src="${blo(OWNERS[0])}" alt=""><div><b>Owner 1</b><span class="stx-mono stx-sig">0x8f3ac2…e91b1c</span></div><span class="stx-ok">Signed</span></li>
+          <li class="o2"><span class="stx-av stx-dev">${KEY_SVG}${WEDGIE_SVG}</span><div><b class="stx-who"><i>Hardware key</i><i>wedgie</i></b><span class="stx-mono stx-sig">0x04b7d9…3fa20e</span></div><span class="stx-ok">Signed</span></li>
+          <li class="o3"><img class="stx-av" src="${blo(OWNERS[2])}" alt=""><div><b>Owner 3</b><span class="stx-mono">${OWNERS[2].slice(0, 6)}…${OWNERS[2].slice(-4)}</span></div><span class="stx-wait">Not needed</span></li>
+        </ol>
+        <div class="stx-done">Executed</div>
       </div>
     </div>
   </section>
@@ -205,7 +197,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelector<HTMLAnchorElement>("#order-go")!.href = kit ? "/order?item=kit" : "/order";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
-  deed(main.querySelector<HTMLElement>(".deed")!);
+  safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
     new IntersectionObserver(async (es, o) => {
@@ -248,13 +240,15 @@ function assembly(box: HTMLElement) {
   }, { rootMargin: "400px" }).observe(stage);
 }
 
-// The Safe contract signs itself as it scrolls by: owner 1's ink, then owner 2's key turns into a wedgie,
-// its screen checks, and the 2-of-3 stamp lands. --p (0..1) drives it all in CSS.
-function deed(box: HTMLElement) {
+// The Safe transaction signs itself as it scrolls by: owner 1 signs, owner 2's hardware key turns into a
+// wedgie and its screen checks, 2 of 2 confirmations, executed. --p (0..1) drives it all in CSS.
+function safeTx(box: HTMLElement) {
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const update = () => {
     const r = box.getBoundingClientRect();
     const p = Math.max(0, Math.min(1, (innerHeight * 0.9 - r.top) / Math.max(1, r.height - innerHeight * 0.08)));   // done once it all shows
     box.style.setProperty("--p", p.toFixed(3));
+    box.dataset.n = still || p >= .74 ? "2" : p >= .3 ? "1" : "0";   // confirmations, as each signature lands
   };
   addEventListener("scroll", update, { passive: true });
   addEventListener("resize", update);

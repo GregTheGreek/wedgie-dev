@@ -663,26 +663,57 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .why { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--recess); box-shadow: var(--recess-shadow); max-width: 520px; text-align: left; }
 .why p { margin: 6px 0; }
 .safe-ui { float: right; }
-/* Safe signer: a paper contract that signs itself as it scrolls by (home.ts deed, --p 0..1). */
+/* Safe signer: a Safe transaction that signs itself as it scrolls by (home.ts safeTx, --p 0..1).
+   Stages: owner 1 .1-.3, key -> wedgie .35-.55, wedgie signs .6-.75, executed .85-1. */
 .signer { display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; align-items: center; }
 .signer h2 { margin: 0; }
 .signer p { color: #474947; margin: 12px 0 18px; }
-.deed { --p: 0; max-width: 420px; justify-self: center; width: 100%; transform: rotate(1.5deg); filter: drop-shadow(0 14px 18px rgba(20,20,20,.18)); }
-.deed svg { display: block; width: 100%; height: auto; }
-.deed-paper { fill: #fbf8ef; stroke: #e6e0cc; }
-.deed text { font-family: var(--font); }
-.deed-t { text-anchor: middle; font: 900 26px var(--font); fill: var(--ink); letter-spacing: .02em; }
-.deed-s { text-anchor: middle; font-size: 14px; font-weight: 700; fill: var(--muted); }
-.deed-l { font-size: 16px; font-weight: 700; fill: var(--ink); }
-.deed-line { stroke: #9a9583; stroke-width: 1.2; }
-.deed-o { font-size: 12px; font-weight: 800; fill: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
-.deed-ink { fill: none; stroke: #23408e; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: clamp(0, calc(1 - var(--p) / .35), 1); }
-.deed-key, .deed-wedgie { transform-box: fill-box; transform-origin: center; }
-.deed-key { opacity: min(clamp(0, calc((var(--p) - .3) * 10), 1), clamp(0, calc((.62 - var(--p)) * 12), 1)); }
-.deed-wedgie { opacity: clamp(0, calc((var(--p) - .55) * 10), 1); scale: clamp(.4, calc(.4 + (var(--p) - .55) * 6), 1); }
-.deed-check { stroke-dasharray: 1; stroke-dashoffset: clamp(0, calc(1 - (var(--p) - .72) * 8), 1); }
-.deed-by { font-size: 13px; font-weight: 800; fill: var(--mint-d); opacity: clamp(0, calc((var(--p) - .82) * 10), 1); }
-.deed-stamp { opacity: clamp(0, calc((var(--p) - .9) * 12), 1); }
-.deed-stamp text { text-anchor: middle; font: 900 22px var(--font); fill: #22c452; letter-spacing: .12em; }
+.stx { --p: 0; --s1: clamp(0, calc((var(--p) - .1) * 5), 1); --s2: clamp(0, calc((var(--p) - .6) * 7), 1); --s3: clamp(0, calc((var(--p) - .85) * 7), 1);
+  --swap: clamp(0, calc((var(--p) - .38) * 6), 1);
+  width: 100%; max-width: 440px; justify-self: center; background: #fff; border-radius: 18px; padding: 18px;
+  box-shadow: 0 0 0 1px #e4e4e0, 0 18px 40px -18px rgba(20,20,20,.35); font-size: 15px; }
+.stx-mono { display: block; font: 500 12.5px var(--mono); color: var(--muted); }
+.stx-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.stx-head b { display: block; line-height: 1.2; }
+.stx-logo { width: 40px; height: 40px; border-radius: 11px; background: #121312; color: #12ff80; display: grid; place-items: center; flex: none; }
+.stx-logo svg { width: 24px; height: 24px; }
+.stx-chain { margin-left: auto; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: #eaf0ff; color: #2151f5; }
+.stx-tx { padding: 14px 0 10px; }
+.stx-tx b { display: block; font-size: 20px; line-height: 1.25; }
+.stx-fn { display: inline-block; font: 500 12px var(--mono); padding: 2px 8px; border-radius: 6px; background: #f1f1ee; color: var(--ink); margin-bottom: 6px; }
+.stx-conf { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: var(--muted); }
+.stx-n { color: var(--ink); }
+.stx-n i { font-style: normal; display: none; }
+.stx-n .n0 { display: inline; }
+.stx[data-n="1"] .stx-n .n0, .stx[data-n="2"] .stx-n .n0 { display: none; }
+.stx[data-n="1"] .stx-n .n1, .stx[data-n="2"] .stx-n .n2 { display: inline; }
+.stx-meter { height: 6px; border-radius: 99px; background: #ececea; margin: 6px 0 8px; overflow: hidden; }
+.stx-meter i { display: block; height: 100%; background: var(--mint); width: calc((var(--s1) + var(--s2)) * 50%); }
+.stx-owners { list-style: none; margin: 0; padding: 0; }
+.stx-owners li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.stx-owners li > div { min-width: 0; flex: 1; }
+.stx-owners b { display: block; font-size: 15px; line-height: 1.3; }
+.stx-av { width: 34px; height: 34px; border-radius: 50%; flex: none; margin: 0 10px; }
+.stx-dev { position: relative; border-radius: 9px; color: #b8902a; width: 54px; height: 34px; margin: 0; }
+.stx-dev svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stx-key { opacity: calc(1 - var(--swap)); transform: rotate(calc(var(--swap) * 90deg)) scale(calc(1 - var(--swap) * .5)); }
+.stx-wedgie { opacity: var(--swap); transform: scale(calc(.5 + var(--swap) * .5)); }
+.stx-dev { background: color-mix(in srgb, #f6efd9 calc((1 - var(--swap)) * 100%), transparent); }
+.stx-who { position: relative; }
+.stx-who i { font-style: normal; }
+.stx-who i:first-child { opacity: calc(1 - var(--swap)); }
+.stx-who i:last-child { position: absolute; left: 0; top: 0; opacity: var(--swap); color: var(--mint-d); }
+.stx-check { stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--s2)); }
+.stx-sig { clip-path: inset(0 calc((1 - var(--sig, 0)) * 100%) 0 0); }
+.o1 .stx-sig { --sig: var(--s1); }
+.o2 .stx-sig { --sig: var(--s2); }
+.stx-ok, .stx-wait { font-size: 12px; font-weight: 900; padding: 3px 10px; border-radius: 999px; }
+.stx-ok { background: #e3f8e8; color: var(--mint-d); }
+.o1 .stx-ok { opacity: var(--s1); }
+.o2 .stx-ok { opacity: var(--s2); }
+.stx-wait { background: #f1f1ee; color: var(--muted); opacity: var(--s3); }
+.o3 { opacity: calc(1 - var(--s3) * .45); }
+.stx-done { margin-top: 10px; text-align: center; font-weight: 900; letter-spacing: .04em; color: #fff; border-radius: 12px; padding: 10px;
+  background: var(--green-fill); opacity: calc(.15 + var(--s3) * .85); filter: grayscale(calc(1 - var(--s3))); }
 @media (max-width: 860px) { .signer { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .deed { --p: 1 !important; } }
+@media (prefers-reduced-motion: reduce) { .stx { --p: 1 !important; } }
