@@ -2,101 +2,6 @@
   "about": "Apps from GitHub repos, on wedgie.dev for everyone, signed with the firmware. Each is pinned to the commit that was reviewed. Add one: node tools/community.mjs add owner/repo, review git diff community/, node tools/sign.mjs, commit. See docs/APPS.md.",
   "repos": [
     {
-      "repo": "clawdbotatg/wedgie-buttons",
-      "sha": "3a3697cca92b0b67387ad9e6f58e510be87147d4",
-      "approved": "2026-10-03",
-      "at": "2026-10-03T19:40:07Z",
-      "v": {
-        "buttons": "a7883fe8a210"
-      }
-    },
-    {
-      "repo": "clawdbotatg/wedgie-keypad",
-      "sha": "14a0eec4f745a99952c91087782259db06210a1b",
-      "approved": "2026-10-03",
-      "at": "2026-10-03T23:54:49Z",
-      "v": {
-        "keypad": "f413db18f2a5"
-      },
-      "past": [
-        {
-          "sha": "9f0a17a58426f6df37fa3dae34f245ac301fd896",
-          "at": "2026-10-03T22:50:42Z",
-          "v": {
-            "keypad": "8a0388e7a7c0"
-          }
-        }
-      ]
-    },
-    {
-      "repo": "clawdbotatg/wedgie-grove",
-      "sha": "4f7748df88f8de7d4ec8ea4f12df50fa5ca5deda",
-      "at": "2026-10-04T00:38:11Z",
-      "approved": "2026-10-04",
-      "v": {
-        "grove": "95642aa78667"
-      },
-      "past": [
-        {
-          "sha": "de6f066fa47ce3ced8fb209a823cc8af38fbca85",
-          "at": "2026-10-03T23:30:44Z",
-          "v": {
-            "grove": "87931bd38816"
-          }
-        }
-      ]
-    },
-    {
-      "repo": "clawdbotatg/wedgie-frog",
-      "sha": "f9ad2ec96ace6764d82d25dcff530c5a9497345a",
-      "at": "2026-10-09T04:56:54Z",
-      "approved": "2026-10-09",
-      "v": {
-        "frog": "f656e9d83b1c"
-      },
-      "past": [
-        {
-          "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
-          "at": "2026-10-03T23:57:29Z",
-          "v": {
-            "frog": "71630fd360d9"
-          }
-        },
-        {
-          "sha": "1ebd30c87d74144c9cb292c6302cdd35bd7142d3",
-          "at": "2026-10-03T23:09:42Z",
-          "v": {
-            "frog": "371565e80ef6"
-          }
-        }
-      ]
-    },
-    {
-      "repo": "clawdbotatg/wedgie-bunker",
-      "sha": "4b4f2a8abe5b23e82c9aaa6a8a3a74ec7b01a125",
-      "at": "2026-10-04T20:23:06Z",
-      "approved": "2026-10-04",
-      "v": {
-        "bunker": "7b3bf2bb4266"
-      },
-      "past": [
-        {
-          "sha": "ea6e1fdf9ab5c81d3d8d57c9189e6ef68ebba784",
-          "at": "2026-10-04T17:03:50Z",
-          "v": {
-            "bunker": "91cfa99ebb56"
-          }
-        },
-        {
-          "sha": "f676d107aa88717ab6fbf36fe29ac358adafa1cd",
-          "at": "2026-10-04T04:13:27Z",
-          "v": {
-            "bunker": "b70533e86d31"
-          }
-        }
-      ]
-    },
-    {
       "repo": "clawdbotatg/wedgie-safe",
       "sha": "e615b62b2c6719afe97b860528bfac03fef0339d",
       "at": "2026-10-12T03:05:32Z",
@@ -194,6 +99,101 @@
           "at": "2026-10-05T18:10:41Z",
           "v": {
             "safe": "414d2d22a47f"
+          }
+        }
+      ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-buttons",
+      "sha": "3a3697cca92b0b67387ad9e6f58e510be87147d4",
+      "approved": "2026-10-03",
+      "at": "2026-10-03T19:40:07Z",
+      "v": {
+        "buttons": "a7883fe8a210"
+      }
+    },
+    {
+      "repo": "clawdbotatg/wedgie-keypad",
+      "sha": "14a0eec4f745a99952c91087782259db06210a1b",
+      "approved": "2026-10-03",
+      "at": "2026-10-03T23:54:49Z",
+      "v": {
+        "keypad": "f413db18f2a5"
+      },
+      "past": [
+        {
+          "sha": "9f0a17a58426f6df37fa3dae34f245ac301fd896",
+          "at": "2026-10-03T22:50:42Z",
+          "v": {
+            "keypad": "8a0388e7a7c0"
+          }
+        }
+      ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-frog",
+      "sha": "f9ad2ec96ace6764d82d25dcff530c5a9497345a",
+      "at": "2026-10-09T04:56:54Z",
+      "approved": "2026-10-09",
+      "v": {
+        "frog": "f656e9d83b1c"
+      },
+      "past": [
+        {
+          "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
+          "at": "2026-10-03T23:57:29Z",
+          "v": {
+            "frog": "71630fd360d9"
+          }
+        },
+        {
+          "sha": "1ebd30c87d74144c9cb292c6302cdd35bd7142d3",
+          "at": "2026-10-03T23:09:42Z",
+          "v": {
+            "frog": "371565e80ef6"
+          }
+        }
+      ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-grove",
+      "sha": "4f7748df88f8de7d4ec8ea4f12df50fa5ca5deda",
+      "at": "2026-10-04T00:38:11Z",
+      "approved": "2026-10-04",
+      "v": {
+        "grove": "95642aa78667"
+      },
+      "past": [
+        {
+          "sha": "de6f066fa47ce3ced8fb209a823cc8af38fbca85",
+          "at": "2026-10-03T23:30:44Z",
+          "v": {
+            "grove": "87931bd38816"
+          }
+        }
+      ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-bunker",
+      "sha": "4b4f2a8abe5b23e82c9aaa6a8a3a74ec7b01a125",
+      "at": "2026-10-04T20:23:06Z",
+      "approved": "2026-10-04",
+      "v": {
+        "bunker": "7b3bf2bb4266"
+      },
+      "past": [
+        {
+          "sha": "ea6e1fdf9ab5c81d3d8d57c9189e6ef68ebba784",
+          "at": "2026-10-04T17:03:50Z",
+          "v": {
+            "bunker": "91cfa99ebb56"
+          }
+        },
+        {
+          "sha": "f676d107aa88717ab6fbf36fe29ac358adafa1cd",
+          "at": "2026-10-04T04:13:27Z",
+          "v": {
+            "bunker": "b70533e86d31"
           }
         }
       ]
