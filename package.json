@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.7",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/three": "^0.186.0",
@@ -35,6 +36,7 @@
     "@walletconnect/core": "^2.25.0",
     "@walletconnect/utils": "^2.25.0",
     "blo": "^2.1.1",
+    "nodemailer": "^6.9.16",
     "qrcode-generator": "^1.4.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

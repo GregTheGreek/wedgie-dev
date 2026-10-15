@@ -2,7 +2,7 @@
 // an order's cart, how it was paid, and its address SEALED in the buyer's browser (src/shop/seal.ts) to
 // a key only the shipping computer has. This code can't read an address and never tries. Once a box
 // ships, the sealed address, the payer and the payment links are wiped; the rest goes 30 days later.
-// Also a keyed hash of the buyer's IP (ipOf), for OPEN_MAX; wiped after a day.
+// Also a keyed hash of the buyer's IP (ipOf), for OPEN_MAX; wiped after a day. Their email: _mail.ts.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
@@ -39,6 +39,13 @@ export async function db() {
     await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
     await sql`alter table orders add column if not exists from_block bigint`;   // usdc: the chain's head when it was made
     await sql`alter table orders add column if not exists ip text`;   // ipOf: a hash, never the IP
+    await sql`alter table orders add column if not exists email_hash text`;   // _mail.ts emailHash: finds a buyer's orders at login
+    await sql`alter table orders add column if not exists email_enc text`;    // _mail.ts lock: the email, for paid + shipped; wiped when it ships
+    await sql`alter table orders add column if not exists paid_mailed timestamptz`;
+    await sql`create index if not exists orders_email on orders (email_hash) where email_hash is not null`;
+    await sql`create table if not exists logins (     -- a login code sent to an email (api/login.ts)
+      email_hash text primary key, code_hash text not null, expires timestamptz not null, tries int not null default 0,
+      sent_at timestamptz not null, hour_start timestamptz not null, sends int not null default 1)`;
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;

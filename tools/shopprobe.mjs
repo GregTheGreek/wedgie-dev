@@ -80,7 +80,7 @@ async function newOrder(kits = 0) {
   await page.waitForFunction(() => !document.querySelector("#o-usdc").disabled);
   if (kits) await page.locator('[data-item=kit] [data-d="1"]').click();
   await page.fill("[name=name]", NAME); await page.fill("[name=line1]", STREET); await page.fill("[name=city]", "Testville");
-  await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202");
+  await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202"); await page.fill("[name=email]", "probe@example.com");
   await page.locator("#o-usdc").click();
   await page.waitForURL(/\/order\/[0-9a-f]{12}$/);
   await page.getByText("Copy amount").waitFor();

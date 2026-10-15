@@ -27,8 +27,9 @@ type Mem = Record<string, { token: string; at?: number; tx?: string }>;
 export const mem = (): Mem => { try { return JSON.parse(localStorage.getItem(MEM) || "{}"); } catch { return {}; } };
 const remember = (id: string, v: Partial<Mem[string]>) => { const m = mem(); m[id] = { ...m[id], ...v } as Mem[string]; localStorage.setItem(MEM, JSON.stringify(m)); };
 
-async function api(body?: unknown) {
-  const res = await fetch("/api/order", body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+const login = (body: unknown) => api(body, "/api/login");
+async function api(body?: unknown, url = "/api/order") {
+  const res = await fetch(url, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
   const r = await res.json().catch(() => ({ error: `The shop didn't answer (${res.status}).` }));
   if (!res.ok) throw new Error(r.error || `The shop didn't answer (${res.status}).`);
   return r;
@@ -47,16 +48,40 @@ export function order(main: HTMLElement) {
   const body = main.querySelector<HTMLElement>("#o-body")!;
   const msgEl = main.querySelector<HTMLElement>("#o-msg")!;
   const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); };
-  if (all) list(body); else if (id) status(id, body, say); else form(body, say);
+  if (all) list(body, say); else if (id) status(id, body, say); else form(body, say);
 }
 
 // ---- every order this browser made, newest first ----
 const STATUS: Record<string, string> = { new: "Not paid", expired: "Time ran out", paid: "Paid", shipped: "Shipped", canceled: "Canceled" };
-function list(box: HTMLElement) {
+function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
-  if (!yours.length) { box.innerHTML = `<div class="safe-box recess"><p>No orders in this browser.</p><p><a class="btn btn-green" href="/order">Order a wedgie</a></p></div>`; return; }
   box.innerHTML = yours.map(([i]) => `<a class="safe-box recess orders-row" href="/order/${esc(i)}" data-id="${esc(i)}">
-    <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("");
+    <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("") + `
+    <div class="safe-box recess" id="o-login"><h2>${yours.length ? "Ordered somewhere else?" : "Find your orders"}</h2>
+      <p class="fine">We'll email you a code.</p>
+      <form class="order-fields" id="o-find"><label class="wide">Email <input name="email" type="email" autocomplete="email" maxlength="100" required></label>
+        <label class="wide" hidden>Code <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label></form>
+      <p><button class="btn btn-green" id="o-go">Email me a code</button></p></div>`;
+  const f = box.querySelector<HTMLFormElement>("#o-find")!, go = box.querySelector<HTMLButtonElement>("#o-go")!;
+  const email = f.querySelector<HTMLInputElement>("[name=email]")!, code = f.querySelector<HTMLInputElement>("[name=code]")!;
+  let sent = false;
+  const step = async () => {
+    go.disabled = true;
+    try {
+      if (!sent) {
+        await login({ email: email.value.trim() });
+        sent = true; code.parentElement!.hidden = false; go.textContent = "Open my orders"; code.focus();
+        say("If that email has orders, a code is on its way.");
+      } else {
+        const r = await login({ email: email.value.trim(), code: code.value });
+        r.orders.forEach((o: { id: string; token: string; at: number }) => remember(o.id, { token: o.token, at: o.at }));
+        location.reload();     // the header's Orders button too
+      }
+    } catch (e) { say(msgOf(e), true); }
+    go.disabled = false;
+  };
+  go.onclick = step;
+  f.onsubmit = (e) => { e.preventDefault(); step(); };
   yours.forEach(([i, o]) => api({ id: i, token: o.token }).then((v: View) => {
     const row = box.querySelector<HTMLElement>(`[data-id="${i}"]`)!;
     const items = v.lines ? v.lines.map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ") : "";
@@ -93,7 +118,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
         <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
         <label>State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
         <label>ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
-        <label class="wide">Email <span class="fine">(optional: only if something goes wrong with your order; deleted with the address)</span> <input name="email" type="email" autocomplete="email" maxlength="100"></label>
+        <label class="wide">Email <span class="fine">(for the tracking number; never shared)</span> <input name="email" type="email" autocomplete="email" maxlength="100"></label>
       </form>
     </div>
     <div class="safe-box recess" id="o-pay">
@@ -102,7 +127,8 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="row"><button class="btn btn-green" id="o-usdc" disabled>Pay in USDC</button>
         on <select id="o-chain">${Object.entries(PAY_CHAINS).map(([c, x]) => `<option value="${c}"${c === "8453" ? " selected" : ""}>${esc(x.name)}</option>`).join("")}</select></p>
       <p class="fine" id="o-open">Checking the shop.</p>
-    </div>`;
+    </div>
+    <p class="fine"><a href="/orders">Ordered before? Find your orders</a></p>`;
 
   let extra = 0;     // cents over list right now (catalog.ts); the server works it out again at checkout
   const paint = () => {
@@ -142,7 +168,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     const v = (n: string) => (box.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();
     const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v("state"), zip: v("zip"), email: v("email") };
     const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city" : !STATES.includes(s.state) ? "your state"
-      : !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP" : s.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "a real email, or none" : "";
+      : !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "your email" : "";
     if (bad) { say(`Fill in ${bad}.`, true); return null; }
     if (!cartCents(cart, extra)) { say("Pick at least one.", true); return null; }
     return s;
@@ -155,7 +181,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       say("Locking your address.");
       const sealed = await seal({ ...s, cart });
       say(pay === "card" ? "Opening checkout." : "Making your order.");
-      const r = await api({ cart, sealed, pay, chain: Number(box.querySelector<HTMLSelectElement>("#o-chain")!.value) });
+      const r = await api({ cart, sealed, email: s.email, pay, chain: Number(box.querySelector<HTMLSelectElement>("#o-chain")!.value) });
       remember(r.id, { token: r.token, at: Date.now() });
       location.href = r.url || `/order/${r.id}`;
     } catch (e) { say(msgOf(e), true); b.disabled = false; }

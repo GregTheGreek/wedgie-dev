@@ -39,6 +39,8 @@ Passwords: `.env` here and `~/.wedgie-credentials.env`. Never in git. New accoun
 Never holds an address it can read. The browser seals it (`src/shop/seal.ts`) to omen's key (`OMEN_KEY`,
 committed; private half only on omen, `wedgie-shipping/orders.py`). `api/` (Vercel + Neon) keeps only the
 sealed text and wipes it when omen ships. Stripe gets no address. Never log a request body in `api/`.
+Email (`api/_mail.ts`, from wedgie@buidlguidl.com): stored only as a keyed hash (login, `api/login.ts`) and
+locked till it ships (paid + shipped mails). Test: `node tools/mailprobe.mjs`.
 Prices: `src/shop/catalog.ts`. Test: `ORDERS_PY=<wedgie-shipping>/orders.py node tools/shopprobe.mjs`.
 
 ## Run / check

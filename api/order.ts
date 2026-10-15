@@ -1,11 +1,12 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now
-//   POST {cart, sealed, pay, chain?}          a new order -> {id, token, url?} (url: Stripe Checkout)
+//   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
 //   POST {id, token, tx?, renew?}             its status; tx = a USDC payment to check (else the chain is searched);
 //                                             renew: an expired order quoted again at today's price
 // A quote holds 10 minutes (catalog.ts QUOTE); then the order is 'expired'.
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
+import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, ipOf, tooMany, type Order } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
@@ -29,16 +30,19 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   const o = open();
   if (!cartOk(b?.cart)) return oops("Pick what you'd like.");
   if (typeof b.sealed !== "string" || !/^v1\.[A-Za-z0-9_.-]{40,4000}$/.test(b.sealed)) return oops("The address didn't come through sealed.");
+  if (typeof b.email !== "string" || b.email.length > 100 || !EMAIL.test(b.email.trim())) return oops("Fill in your email.");
   const cart = { wedgie: b.cart.wedgie, kit: b.cart.kit };
   await expireOld(sql);
   const many = await tooMany(sql, ip);
   if (many) return oops(many, 429);
   const lines = cartLines(cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
-  const id = randomHex(6), token = randomHex(16), th = await sha256(token);
+  const id = randomHex(6), token = await tokenOf(id), th = await sha256(token);
+  const keyed = !!env("SHOP_MAIL_KEY");     // no key (dev): the order still works, it just can't be mailed or found by email
+  const eh = keyed ? await emailHash(b.email) : null, ee = keyed ? await lock(b.email.trim()) : null;
   if (b.pay === "card") {
     if (!o.card) return oops("Card checkout isn't open yet.", 503);
-    await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, ip) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'card', ${b.sealed}, ${ip})`;
+    await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, ip, email_hash, email_enc) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'card', ${b.sealed}, ${ip}, ${eh}, ${ee})`;
     const s = await checkout({ id, cart, lines }, origin);
     await sql`update orders set stripe_session = ${s.id} where id = ${id}`;
     return json({ id, token, url: s.url });
@@ -52,7 +56,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     for (let i = 0; i < 8; i++) {
       const usdc = BigInt(cents) * 10_000n + BigInt(1 + Math.floor(Math.random() * 9999));
       try {
-        await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, chain, usdc, from_block, ip) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'usdc', ${b.sealed}, ${chain}, ${usdc.toString()}, ${head}, ${ip})`;
+        await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, chain, usdc, from_block, ip, email_hash, email_enc) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'usdc', ${b.sealed}, ${chain}, ${usdc.toString()}, ${head}, ${ip}, ${eh}, ${ee})`;
         return json({ id, token });
       } catch (e: any) { if (!/orders_open_usdc/.test(e?.message || "")) throw e; }
     }
@@ -94,6 +98,7 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     if (typeof r === "string") return oops(r, 429);
     Object.assign(o, r.o); url = r.url; why = undefined;
   }
+  if (o.status === "paid") await mailPaid(sql, o.id, origin);
   return json({ ...publicView(o), url, why });
 }
 
