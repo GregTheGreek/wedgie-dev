@@ -1,12 +1,13 @@
 // /order end to end on a Base fork (anvil), with the shop's real server (api/, under `vite` on the dev
 // database branch) and the shipping computer's real orders.py:
-//   1. a USDC order through the page's form: what leaves the browser never holds the address in clear
+//   1. a USDC order through the page's form: its own deposit address; what leaves the browser never holds the
+//      address in clear
 //   2. pay it from window.ethereum (an anvil account holding fork USDC): Paid once confirmed. The price went up
 //      when it was opened (open quotes count, so six orders can't each get the bottom price) and stays up
-//   3. a QR-style payment (any wallet, no hash pasted): the server finds it on chain
-//   4. a third order can't claim the first one's transaction
+//   3. plain transfers, wrong amounts: short (the page asks for the rest), then too much: paid
+//   4. paid with the page closed: the shipping computer's list still finds it
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
-//   6. /api/admin refuses without the token
+//   6. /api/admin refuses without the token; the deposits sweep to the Safe
 // Needs anvil, ALCHEMY_API_KEY (or BASE_RPC) to fork from, uv or python3 with `cryptography`, Node 23+.
 // No SHOP_DATABASE_URL_DEV in .env? It runs on an in-memory Postgres (tools/neonlite.mjs).
 // Run: node tools/shopprobe.mjs [outdir]
@@ -15,6 +16,9 @@ import { readdirSync, writeFileSync, mkdtempSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { spawn, execFileSync } from "node:child_process";
 import crypto from "node:crypto";
+import { registerHooks } from "node:module";
+
+registerHooks({ resolve: (s, c, next) => { try { return next(s, c); } catch (e) { if (s.endsWith(".js")) return next(s.slice(0, -3) + ".ts", c); throw e; } } });   // src/ says .js (Vercel)
 
 const out = process.argv[2];
 const ORDERS_PY = process.env.ORDERS_PY || homedir() + "/clawd/wedgie-shipping/orders.py";
@@ -95,7 +99,9 @@ const extraOpen = (await (await fetch(SITE + "/api/order")).json()).extra;
 ok(extraOpen > extra0 + 900 && extraOpen <= extra0 + 1000, `an open order raises the price (${extra0} -> ${extraOpen} cents)`);
 const want = (6700 + 5700 + 500 + 2 * extra0) / 100;
 const amount = await page.locator("[data-copy]").first().getAttribute("data-copy");
-ok(Math.floor(Number(amount) * 100) / 100 === want && !/\.\d\d0000$/.test(amount), `asks for ${want} USDC plus a tag (${amount})`);
+ok(Number(amount) === want, `asks for ${want} USDC (${amount})`);
+const dep1 = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
+ok(/^0x[0-9a-fA-F]{40}$/.test(dep1) && dep1.toLowerCase() !== PAY_TO, `its own deposit address (${dep1})`);
 ok(await page.locator(".order-qr svg").count() === 1 && /\d:\d\d/.test(await page.locator(".o-left").first().innerText()), "a QR code and a countdown");
 ok(sent.length && sent.every((b) => !b.includes(NAME) && !b.includes(STREET)), "the address never left the browser in clear");
 
@@ -105,37 +111,41 @@ await page.getByText("Payment sent").waitFor();
 await rpc("anvil_mine", ["0x3"]);
 await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
 await shot("2-paid");
-ok(true, "paid on chain, confirmed, shown");
+ok(true, "paid from the browser's wallet, confirmed, shown");
 const extra1 = (await (await fetch(SITE + "/api/order")).json()).extra;
 ok(extra1 > extra0 + 900 && extra1 <= extra0 + 1000, `2 boxes sold: the price stays up (${extra0} -> ${extra1} cents)`);
 
-// 3: pay like a phone wallet from the QR code would: a plain transfer, nothing pasted
+// 3: any wallet, wrong amounts: short first (the page asks for the rest), then too much: paid
+const send = (to, n) => rpc("eth_sendTransaction", [{ from: me, to: USDC, data: "0xa9059cbb" + to.slice(2).toLowerCase().padStart(64, "0") + n.toString(16).padStart(64, "0") }]);
 const second = await newOrder();
-const exact = BigInt((await page.locator("[data-copy]").first().getAttribute("data-copy")).replace(".", ""));
-await rpc("eth_sendTransaction", [{ from: me, to: USDC, data: "0xa9059cbb" + PAY_TO.slice(2).padStart(64, "0") + exact.toString(16).padStart(64, "0") }]);
+const price2 = BigInt(Math.round(Number(await page.locator("[data-copy]").first().getAttribute("data-copy")) * 1e6));
+const dep2 = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
+ok(dep2 !== dep1, "every order has a different address");
+await send(dep2, 20_000_000n);
+await rpc("anvil_mine", ["0x3"]);
+await page.getByText("more on Base").waitFor({ timeout: 30000 });
+const rest = await page.locator("[data-copy]").first().getAttribute("data-copy");
+await shot("3-short");
+ok(BigInt(Math.round(Number(rest) * 1e6)) === price2 - 20_000_000n, `short: it asks for the rest (${rest})`);
+await send(dep2, price2);   // way too much
 await rpc("anvil_mine", ["0x3"]);
 await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
-ok(true, "a transfer from any wallet is found on chain and paid");
+ok(true, "two sends, too much in total: paid");
 
-// 4: a third order pastes the first one's transaction
-const hashes = [];
-for (let n = Number(await rpc("eth_blockNumber")); n > 0 && !hashes.length; n--) {
-  const b = await rpc("eth_getBlockByNumber", ["0x" + n.toString(16), true]);
-  for (const t of b.transactions) if (t.to?.toLowerCase() === USDC.toLowerCase() && t.from.toLowerCase() === me.toLowerCase()) hashes.push(t.hash);
-}
+// 4: paid after the buyer left the page: the shipping computer's list finds it
 const third = await newOrder();
-await page.fill("#o-tx", hashes[hashes.length - 1]);
-await page.locator("#o-check").click();
-await page.locator(".safe-msg .bad").waitFor();
-const why = await page.locator(".safe-msg").innerText();
-ok(/didn't send exactly|already paid|older/.test(why), `another order can't claim it: "${why}"`);
+const dep3 = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
+const price3 = BigInt(Math.round(Number(await page.locator("[data-copy]").first().getAttribute("data-copy")) * 1e6));
+await page.goto("about:blank");
+await send(dep3, price3);
+await rpc("anvil_mine", ["0x3"]);
 
 // 5
 const env = { ...process.env, SHOP_URL: SITE, SHOP_ADMIN_TOKEN: ADMIN, SHOP_KEY: dir + "/key.pem" };
 const py = (...a) => { try { return execFileSync("uv", ["run", "--quiet", "--with", "cryptography", "python3", ORDERS_PY, ...a], { env, encoding: "utf8" }); }
   catch { return execFileSync("python3", [ORDERS_PY, ...a], { env, encoding: "utf8" }); } };
 const list = py("list");
-ok(list.includes(first) && list.includes(NAME) && list.includes("Testville, CO 80202") && list.includes(second) && !list.includes(third), "orders.py list opens the paid orders' addresses");
+ok(list.includes(first) && list.includes(NAME) && list.includes("Testville, CO 80202") && list.includes(second) && list.includes(third), "orders.py list opens the paid orders' addresses, the one paid with the page closed too");
 py("ship", first, "9400100000000000000001");
 await page.goto(SITE + "/order/" + first);
 await page.getByText("Shipped.").waitFor();
@@ -144,6 +154,18 @@ ok(await page.getByText("9400100000000000000001").isVisible(), "the buyer sees t
 ok(!py("list").includes(first), "shipped: gone from the list (sealed address wiped)");
 py("cancel", second);
 py("cancel", third);
+
+// 5b: sweep the deposits to the Safe: anyone may, nowhere else
+const D = await import("../src/shop/deposits.ts");
+const factory = D.factoryOf(PAY_TO);
+await rpc("eth_sendTransaction", [{ from: me, to: D.DEPLOYER, data: "0x" + "00".repeat(32) + D.FACTORY_CODE.slice(2) + PAY_TO.slice(2).padStart(64, "0") }]);
+const bal = async (a) => BigInt(await rpc("eth_call", [{ to: USDC, data: "0x70a08231" + a.slice(2).toLowerCase().padStart(64, "0") }, "latest"]));
+const held = (await bal(dep1)) + (await bal(dep2)) + (await bal(dep3));
+const salts = [first, second, third].map(D.saltOf);
+const enc = "0x7654b892" + "40".padStart(64, "0") + USDC.slice(2).toLowerCase().padStart(64, "0") + salts.length.toString(16).padStart(64, "0") + salts.map((x) => x.slice(2)).join("");
+await rpc("eth_sendTransaction", [{ from: me, to: factory, data: enc, gas: "0x200000" }]);
+await rpc("anvil_mine", ["0x1"]);
+ok(held > 0n && (await bal(PAY_TO)) === held && (await bal(dep1)) + (await bal(dep2)) + (await bal(dep3)) === 0n, `sweep: all ${held} went to the Safe`);
 
 // 6
 ok((await fetch(SITE + "/api/admin")).status === 401 && (await fetch(SITE + "/api/admin", { headers: { authorization: "Bearer x" } })).status === 401, "/api/admin needs the token");

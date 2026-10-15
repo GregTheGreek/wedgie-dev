@@ -29,12 +29,12 @@ export async function db() {
       pay text not null,              -- card | usdc
       status text not null default 'new',   -- new | paid | shipped | canceled | expired (never paid in time)
       sealed text,                    -- the address, sealed to omen's key; null once shipped
-      chain int, usdc bigint,         -- usdc: the exact amount asked for (its last digits name this order)
+      chain int, usdc bigint,         -- usdc: the amount asked for, in 6-decimal units
       stripe_session text,
       tx text, payer text,
       tracking text,
       created timestamptz not null default now(), paid_at timestamptz, shipped_at timestamptz)`;
-    await sql`create unique index if not exists orders_open_usdc on orders (chain, usdc) where status = 'new' and usdc is not null`;
+    await sql`drop index if exists orders_open_usdc`;   // the old exact-amount orders: amounts needn't be unique now
     await sql`create unique index if not exists orders_tx on orders (chain, tx) where tx is not null`;
     await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
     await sql`alter table orders add column if not exists from_block bigint`;   // usdc: the chain's head when it was made
@@ -42,6 +42,7 @@ export async function db() {
     await sql`alter table orders add column if not exists email_hash text`;   // _mail.ts emailHash: finds a buyer's orders at login
     await sql`alter table orders add column if not exists email_enc text`;    // _mail.ts lock: the email, for paid + shipped; wiped when it ships
     await sql`alter table orders add column if not exists paid_mailed timestamptz`;
+    await sql`alter table orders add column if not exists deposit text`;   // usdc: this order's own address (src/shop/deposits.ts)
     await sql`create index if not exists orders_email on orders (email_hash) where email_hash is not null`;
     await sql`drop table if exists logins`;   // the old 6-digit codes
     await sql`create table if not exists links (      -- a sign-in link emailed (api/login.ts); used once, 15 minutes
@@ -74,14 +75,15 @@ export function same(a: string, b: string) {   // constant time
 
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
-  chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null;
+  chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
   tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
-export const publicView = (o: Order) => ({
+export const publicView = (o: Order, got?: bigint) => ({
   id: o.id, cart: o.cart, lines: o.lines, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
-  payTo: o.pay === "usdc" && o.status === "new" ? env("SHOP_PAY_TO") : undefined,
+  payTo: o.pay === "usdc" && (o.status === "new" || o.status === "expired") ? o.deposit || env("SHOP_PAY_TO") : undefined,
+  got: got?.toString(),     // usdc sent to its deposit so far
   left: o.status === "new" ? Math.max(0, Date.parse(o.created) + QUOTE - Date.now()) : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
@@ -171,6 +173,9 @@ export async function markPaid(sql: Awaited<ReturnType<typeof db>>, id: string, 
 }
 
 // ---- USDC: read the chain ----
+// New orders: each has its own deposit address (src/shop/deposits.ts), so whatever lands there is that order's:
+// any amount, any wallet, any number of sends, late or not. Paid once it holds the price. The old orders
+// (deposit null) were paid to the Safe with an exact amount: usdcPaid / usdcFind below.
 let rpcId = 0;
 export async function rpc(chain: number, method: string, params: unknown[]) {
   if (!env("SHOP_RPC_" + chain)) throw new Error("The shop can't read " + PAY_CHAINS[chain].name + " right now.");
@@ -184,6 +189,23 @@ export async function rpc(chain: number, method: string, params: unknown[]) {
 }
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const topicOf = (a: string) => "0x" + a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+
+/** What this order's deposit address holds, a few blocks back (PAY_CHAINS confirm). Swept funds are gone
+ * from it, but an order is marked paid before anything is swept. */
+export async function usdcGot(o: Order): Promise<bigint> {
+  const c = PAY_CHAINS[o.chain!];
+  const head = BigInt(await rpc(o.chain!, "eth_blockNumber", []));
+  const at = "0x" + (head - BigInt(c.confirm) + 1n).toString(16);
+  const data = "0x70a08231" + o.deposit!.toLowerCase().replace(/^0x/, "").padStart(64, "0");   // balanceOf
+  return BigInt(await rpc(o.chain!, "eth_call", [{ to: c.usdc, data }, at]));
+}
+/** A deposit order that holds its price: paid. Returns whether it is now. */
+export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint }> {
+  const got = await usdcGot(o);
+  if (got < BigInt(o.usdc!)) return { paid: false, got };
+  const done = await sql`update orders set status = 'paid', paid_at = now() where id = ${o.id} and status in ('new', 'expired') returning id`;
+  return { paid: done.length > 0 || o.status === "paid", got };
+}
 
 /** Did this transaction pay this order? The amount's last digits are unique among open orders on the
  * chain, and it must land between the order's making and its quote running out, so a hash can't pay

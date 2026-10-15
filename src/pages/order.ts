@@ -16,7 +16,7 @@ import { transferData } from "../safe/eth";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
 const clock = (ms: number) => { const t = Math.ceil(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
-const usdc = (u: string) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0")}`; };
+const usdc = (u: string) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0").replace(/0{1,4}$/, "")}`; };   // 20.00, 60.487806
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const msgOf = (e: any) => e?.message || String(e);
 const eth = () => (window as any).ethereum;
@@ -247,7 +247,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 
 // ---- one order ----
 type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
-  tracking: string | null; url?: string; why?: string; left?: number };
+  tracking: string | null; url?: string; why?: string; left?: number; got?: string };
 
 function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const fromLink = location.hash.slice(1);
@@ -270,24 +270,30 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       : (Object.keys(ITEMS) as Item[]).filter((k) => v!.cart[k]).map((k) => `${v!.cart[k]} × ${esc(ITEMS[k].name)}`).join(", ");
     let h = `<div class="safe-box recess"><h2>Order ${esc(v.id)}</h2><p>${items} · <b>${usd(v.cents)}</b> shipped</p>`;
     if (v.status === "new" && v.pay === "card") h += `<p>Not paid yet. This price holds for <b class="o-left"></b>.</p>${v.url ? `<p><a class="btn" href="${esc(v.url)}">Pay by card</a></p>` : ""}`;
-    if (v.status === "new" && v.pay === "usdc" && c) {
-      // EIP-681: a phone wallet that scans it opens a USDC transfer with the exact amount filled in.
+    // A deposit order (got is set): its own address, any amount counts, short = send the rest. Something sent
+    // already holds the price, so it stays payable after the clock runs out. Old orders: the exact amount to the Safe.
+    const got = v.got != null ? BigInt(v.got) : null, owe = BigInt(v.usdc || 0) - (got || 0n);
+    if (v.pay === "usdc" && c && (v.status === "new" || v.status === "expired" && got)) {
+      // EIP-681: a phone wallet that scans it opens a USDC transfer with the amount filled in.
       const q = qrcode(0, "M");
-      q.addData(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${v.usdc}`);
+      q.addData(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${owe}`);
       q.make();
       const named = (v.payTo || "").toLowerCase() === SHOP_ENS.address.toLowerCase();
-      h += `<p class="order-pay-now">Send <b>${usdc(v.usdc!)} USDC</b> on ${esc(c.name)} in <b class="o-left"></b></p>
-        <p class="fine">The exact amount: its last digits tell us it's you. <button class="btn btn-sm" data-copy="${usdc(v.usdc!)}">Copy amount</button></p>
+      h += got ? `<p class="order-pay-now">Got ${usdc(got.toString())}. Send <b>${usdc(owe.toString())} USDC</b> more on ${esc(c.name)}</p>
+        <p class="fine">To the same address. <button class="btn btn-sm" data-copy="${usdc(owe.toString())}">Copy amount</button></p>`
+        : `<p class="order-pay-now">Send <b>${usdc(v.usdc!)} USDC</b> on ${esc(c.name)} in <b class="o-left"></b></p>
+        <p class="fine">${got == null ? "The exact amount: its last digits tell us it's you." : "This address is only for this order, and goes to wedgie.eth. Short? Send the rest."} <button class="btn btn-sm" data-copy="${usdc(v.usdc!)}">Copy amount</button></p>`;
+      h += `
         <div class="order-to"><span class="fine">to</span> ${named ? `<b class="order-ens">${SHOP_ENS.name}</b>` : ""}
           <code class="safe-addr">${esc(v.payTo || "")}</code>
           <p><button class="btn btn-sm" data-copy="${esc(v.payTo || "")}">Copy address</button>
           <a class="btn btn-sm" href="${c.scan}/address/${esc(v.payTo || "")}" target="_blank" rel="noopener">See it on ${esc(c.name)}</a></p></div>
         <div class="order-qr">${q.createSvgTag({ cellSize: 5, margin: 2, scalable: true })}</div>
         <p class="fine">Or scan with your phone's wallet: it fills everything in. We see the payment on our own.</p>
-        <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>
-        <p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>`;
+        <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>`
+        + (got == null ? `<p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>` : "");
     }
-    if (v.status === "expired") h += `<p><b>Time ran out.</b> Nothing was charged.</p>
+    if (v.status === "expired" && !got) h += `<p><b>Time ran out.</b> Nothing was charged.</p>
       <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>`;
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
     if (v.status === "shipped") h += `<p class="good"><b>Shipped.</b> Your address is deleted.</p>
@@ -351,7 +357,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     const [from] = await eth().request({ method: "eth_requestAccounts" });
     const want = "0x" + v!.chain!.toString(16);
     if ((await eth().request({ method: "eth_chainId" })) !== want) await eth().request({ method: "wallet_switchEthereumChain", params: [{ chainId: want }] });
-    const tx = await eth().request({ method: "eth_sendTransaction", params: [{ from, to: c.usdc, data: transferData(v!.payTo!, BigInt(v!.usdc!)) }] });
+    const owe = BigInt(v!.usdc!) - BigInt(v!.got || 0);
+    const tx = await eth().request({ method: "eth_sendTransaction", params: [{ from, to: c.usdc, data: transferData(v!.payTo!, owe) }] });
     remember(id, { tx });
     busy = false;
     say("Payment sent. Waiting for the chain to confirm it.");
@@ -364,7 +371,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
   async function watch() {
     if (watching) return;
     watching = true;
-    for (let i = 0; i < 200 && (v as View | null)?.status === "new"; i++) {
+    const open = () => { const w = v as View | null; return w?.status === "new" || w?.status === "expired" && !!w.got && w.got !== "0"; };
+    for (let i = 0; i < 200 && open(); i++) {
       await sleep(5000);
       if (v!.pay === "usdc" || mem()[id]?.tx || i < 24 || Date.now() > ends) await refresh();
     }

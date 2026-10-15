@@ -42,6 +42,8 @@ committed; private half only on omen, `wedgie-shipping/orders.py`). `api/` (Verc
 sealed text and wipes it when omen ships. Stripe gets no address. Never log a request body in `api/`.
 Email (`api/_mail.ts`, from wedgie@buidlguidl.com): stored only as a keyed hash (sign in by emailed link, `api/login.ts`) and
 locked till it ships (paid + shipped mails). Test: `node tools/mailprobe.mjs`.
+USDC: each order has its own deposit address (`src/shop/deposits.ts`, `contracts/`); any amount counts.
+Sweep to wedgie.eth: `tools/deposits.mjs`. Never change the contract codes.
 Prices: `src/shop/catalog.ts`. Test: `ORDERS_PY=<wedgie-shipping>/orders.py node tools/shopprobe.mjs`.
 
 ## Run / check

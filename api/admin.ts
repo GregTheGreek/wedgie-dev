@@ -3,9 +3,9 @@
 //   POST {id, tracking}          shipped: the buyer gets an email with the tracking number; then the sealed address,
 //                                their locked email, payer, transaction and Stripe session are wiped
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way
-// Each GET also deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
-import { db, env, json, oops, same } from "./_shop.js";
-import { unlock, shippedMail } from "./_mail.js";
+// Each GET also marks paid the USDC orders whose deposit address now holds their price, and deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
+import { db, env, json, oops, same, settleDeposit, type Order } from "./_shop.js";
+import { unlock, shippedMail, mailPaid } from "./_mail.js";
 
 const allowed = (req: Request) => {
   const t = env("SHOP_ADMIN_TOKEN");
@@ -17,6 +17,12 @@ export async function GET(req: Request) {
   const sql = await db();
   await sql`delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
     or (status in ('new', 'expired') and created < now() - interval '30 days')`;
+  // USDC sent to an order's deposit address after its buyer left the page still pays it
+  const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')`) as Order[];
+  for (const o of open) {
+    const r = await settleDeposit(sql, o).catch(() => null);
+    if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});
+  }
   const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created from orders where status = 'paid' order by paid_at`;
   return json({ orders });
 }
