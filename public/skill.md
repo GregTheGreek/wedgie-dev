@@ -52,8 +52,8 @@ Makes the wedgie an owner of a Safe{Wallet} (Base, Ethereum, Optimism, Arbitrum,
 App: `clawdbotatg/wedgie-safe`, on the shelf. Page: https://wedgie.dev/safe.
 
 - **The key is made by you, on the wedgie, once.** The first time Safe Signer opens it shows **No key**
-  and "make a key". Press green, then yes: the secure chip makes a new random key inside itself and keeps
-  its public key too, then **locks both for good** (Trust M). Nobody has ever seen the key, including
+  and "make a key". Press green, then yes: the secure chip makes a new random key inside itself, then
+  **locks it for good** (a Trust M or an ATECC608). Nobody has ever seen the key, including
   wedgie.dev, and nothing can ever replace or erase it: no app, no computer, no one. There's no "new key".
 - **Check it's yours.** If Safe Signer shows an address the very first time you open it, someone made a
   key before you got it. Don't use it: it can't be replaced, so the chip has to be swapped.
@@ -463,7 +463,8 @@ The full API with templates and measured speeds is in code.md; the essentials:
 - The secure chip: a Trust M through `import optiga` (trustm.md: keys, signatures, ECDH, RSA, counters,
   storage). An ATECC608 through `atecc.ATECC608(sda=4, scl=5)`: `random()`, `serial()`, `pubkey(slot)`,
   `sign(digest, slot)` (P-256), but a key exists only after its config is written and locked
-  (`write_config`, `lock_config`), which is **permanent**: never do it unless your person asks.
+  (`write_config`, `lock_config`), which is **permanent**: never do it unless your person asks. Slot 0
+  is Safe Signer's (it locks it for good); your app: another slot.
 - **Neither chip does secp256k1** (Ethereum's curve). Both sign P-256, which smart-account wallets with
   passkey-style (P-256 / RIP-7212) verification accept; a plain Ethereum key would have to live in
   software on the Pico, without the chip's protection.

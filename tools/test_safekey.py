@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Safe Signer's key (the shelf's community/clawdbotatg/wedgie-safe/safe_key.py) against a fake Trust M that
-keeps the rules a real one showed (2026-10-15, tools/optigaprobe.py's chip): a key slot never reads out, a
-genkey replaces an unlocked key, and once an object's lifecycle is 0x07 every write, genkey and metadata change
-is refused. The promise checked: the person's key is made once, kept in the chip with its public key, locked
+"""Safe Signer's key (the shelf's community/clawdbotatg/wedgie-safe/safe_key.py) against a fake Trust M and a
+fake ATECC608 that keep the rules real ones showed (2026-10-15). Trust M: a key slot never reads out, a genkey
+replaces an unlocked key, and once an object's lifecycle is 0x07 every write, genkey and metadata change is
+refused. ATECC608: no key until the config is locked, the slot lock needs the data zone locked, and a locked
+slot refuses a new key but still signs and gives its public key. The promise checked: the person's key is made once, kept in the chip with its public key, locked
 for good, and never replaced, and a chip that holds someone else's locked key is never used.
     python3 tools/test_safekey.py   (or: python3 tools/test_safekey.py <wedgie-safe checkout>)"""
 import hashlib, os, sys, types
@@ -86,7 +87,59 @@ class TrustM:
             return False
 
 
+class ATECC:
+    """Slot 0 as a real ATECC608 keeps it; the config zone as read_config returns it."""
+    def __init__(self, cfg=None):
+        self.cfg = bytearray(cfg or bytes(128))
+        self.cfg[86] = self.cfg[87] = 0x55              # data, config: unlocked
+        self.cfg[88] = self.cfg[89] = 0xFF              # SlotLocked: none
+        self.keys = {}
+
+    def read_config(self, b):
+        return bytes(self.cfg[b * 32:b * 32 + 32])
+
+    def lock_state(self):
+        return {"configLocked": self.cfg[87] == 0, "dataLocked": self.cfg[86] == 0}
+
+    def write_config(self):
+        if self.cfg[87] == 0:
+            raise Refused("status 0x0f")
+        self.cfg[16:84] = atecc.CONFIG[16:84]
+        self.cfg[90:128] = atecc.CONFIG[90:128]
+
+    def lock_config(self):
+        if self.cfg[87] == 0:
+            raise Refused("config zone is already locked")
+        self.cfg[87] = 0
+
+    def run(self, op, mode, p2, **kw):
+        assert op == atecc.OP_LOCK
+        if mode == 0x81 and self.cfg[87] == 0 and self.cfg[86] != 0:
+            self.cfg[86] = 0
+        elif mode & 3 == 2 and self.cfg[86] == 0 and self.cfg[96 + 2 * (mode >> 2 & 15)] & 0x20:
+            self.cfg[88] &= ~(1 << (mode >> 2 & 15))
+        else:
+            raise Refused("status 0x0f on opcode 0x17")
+
+    def genkey_new(self, slot=0):
+        if self.cfg[87] != 0 or not self.cfg[88] & 1 << slot:
+            raise Refused("status 0x0f on opcode 0x40")
+        self.keys[slot] = ec.generate_private_key(ec.SECP256R1())
+        return self.pubkey(slot)
+
+    def pubkey(self, slot=0):
+        if slot not in self.keys:
+            raise Refused("status 0x0f on opcode 0x40")
+        n = self.keys[slot].public_key().public_numbers()
+        return n.x, n.y
+
+
 chip = None
+atecc = types.ModuleType("atecc")
+atecc.OP_LOCK = 0x17
+_src = open(os.path.join(root, "firmware/atecc.py")).read()
+atecc.CONFIG = eval(_src[_src.index("bytes([", _src.index("CONFIG = ")):_src.index("])", _src.index("CONFIG = ")) + 2])
+sys.modules["atecc"] = atecc
 optiga = types.ModuleType("optiga")
 optiga.KEY2, optiga.DATA = TrustM.KEY2, TrustM.DATA
 optiga.Chip = lambda: chip
@@ -153,6 +206,50 @@ check(st == "lock", "a safe-12 key: asked to lock it, never locked by itself")
 check(chip.lcs.get(TrustM.KEY2, 1) == 1, "a safe-12 key: still unlocked until the person says")
 K.lock(k)
 check(K.start(None) == ("ok", k), "locked: the chip gives it back")
+
+# ATECC608: a fresh chip; the person makes a key; slot 0 locked for good; the public key from the chip
+a = ATECC()
+check(K.start(None, a) == ("none", None), "ATECC608 fresh: no key")
+k = K.make(a)
+check(K.start(None, a) == ("ok", k), "ATECC608 made: the chip gives it back (the Pico keeps nothing)")
+check(a.lock_state() == {"configLocked": True, "dataLocked": True} and not a.cfg[88] & 1, "ATECC608 made: slot 0 locked")
+for what, f in (("a second make", lambda: K.make(a)), ("a new key from any app", lambda: a.genkey_new(0))):
+    try:
+        f()
+        check(False, "ATECC608: %s is refused" % what)
+    except OSError:
+        check(True, "ATECC608: %s is refused" % what)
+check(K.start({"x": "0x" + "11" * 32, "y": "0x" + "22" * 32, "chip": "ATECC608"}, a) == ("ok", k), "ATECC608: a planted save changes nothing")
+check(a.genkey_new(2) and True, "ATECC608: other slots still free for other apps")
+
+# ATECC608: a key from safe-12 (made, saved, never locked): the person locks it, or makes their own
+a = ATECC()
+a.write_config(); a.lock_config()
+x, y = a.genkey_new(0)
+saved = {"x": "0x%064x" % x, "y": "0x%064x" % y, "chip": "ATECC608"}
+st, k = K.start(saved, a)
+check(st == "lock" and a.cfg[88] & 1, "ATECC608 safe-12 key: asked to lock it, never locked by itself")
+K.lock(k, a)
+check(K.start(None, a) == ("ok", k), "ATECC608 safe-12 key locked: the chip gives it back")
+
+# ATECC608: an unlocked key with no save (a make cut off, or someone else's): no key; making one replaces it
+a = ATECC()
+a.write_config(); a.lock_config()
+a.genkey_new(0)
+old = a.keys[0]
+check(K.start(None, a) == ("none", None), "ATECC608 unlocked key, no save: no key")
+k = K.make(a)
+check(a.keys[0] is not old and K.start(None, a) == ("ok", k), "ATECC608: making a key replaces it")
+
+# ATECC608: config locked by someone else with slot 0 set up another way: never used
+cfg = bytearray(atecc.CONFIG); cfg[96] = 0x13
+a = ATECC(cfg); a.lock_config()
+check(K.start(None, a) == ("swap", None), "ATECC608 config not Safe Signer's: swap the chip")
+try:
+    K.make(a)
+    check(False, "ATECC608 config not Safe Signer's: make refused")
+except OSError:
+    check(True, "ATECC608 config not Safe Signer's: make refused")
 
 print("%d FAILED" % bad if bad else "all ok")
 sys.exit(1 if bad else 0)

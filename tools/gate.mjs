@@ -8,7 +8,7 @@
 //     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
 //   - the guides match the firmware, and the WEDGIE drive's SKILL.md matches them (tools/test_docs.py)
-//   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M)
+//   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M and ATECC608)
 //     and its signing runs in the shelf copy's memory (tools/safechip.mjs)
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
 // when 0.3.13 broke), and no real board. Run tools/boardprobe.py on one before telling anyone it works.
