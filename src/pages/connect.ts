@@ -80,7 +80,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
           el.innerHTML = `<div class="wrow-dev"></div>
             <div class="wrow-body"><div class="wrow-head"><span class="light"></span><span class="idtag"></span></div>
             <dl class="facts"><dt>Hardware</dt><dd data-f="hw"></dd><dt>Firmware</dt><dd data-f="fw"></dd><dt>Software</dt><dd data-f="pl"></dd></dl></div>
-            <span class="chev" aria-hidden="true">›</span>`;
+            <span class="btn btn-green wrow-go">Configure ›</span>`;
           el.addEventListener("click", (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || !el!.dataset.id) return; e.preventDefault(); go(el!.getAttribute("href")!); });
           rows.appendChild(el);
           (el as any)._w3d = place3D(el.querySelector<HTMLElement>(".wrow-dev")!, { interactive: false, screen: screenFor(w), side: w.key % 2 ? 1 : -1 });
