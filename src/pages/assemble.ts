@@ -92,7 +92,7 @@ const STEPS: Step[] = [
     d: "16", ph: ["16-buttons-tweezers", "16-buttons-placed", "16-ready"] },
   { t: "Boards into the base",
     p: `Screen up, <b>USB-C end first</b> into the base's hole, then lower the rest. Don't force it straight down. The screen board lies flat on the rails, the USB port centered in the hole.`,
-    d: "17", ph: ["17-in-base", "17-usb-centered", "17-usb-centered-closed"],
+    d: "17", ph: ["17-in-base", "17-usb-centered"],
     warn: `The USB-C port must sit right in the middle of the hole. If it doesn't, something is wrong: take it out and do it again before you close the case.` },
   { t: "Check the USB-C fit",
     p: `Look at the USB-C end. The port must line up perfectly with the hole in the base.`,
