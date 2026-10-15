@@ -62,6 +62,8 @@ App: `clawdbotatg/wedgie-safe`, on the shelf. Page: https://wedgie.dev/safe.
 - Other apps use the chip's other key slots (trustm.md); they can't touch this one.
 - **Signing:** the page sends the transaction, the wedgie works out the hash itself, shows what it does,
   and signs only on green. Red says no.
+- **Execute on wedgie.dev/safe.** Safe{Wallet} can't execute a transaction a wedgie signed: it fails with
+  GS021 (Safe's bug, https://github.com/safe-global/safe-wallet-monorepo/issues/8808). Signing there is fine.
 - On chain the key is a passkey-style owner (P-256, Safe's WebAuthn signer). The wedgie shows its owner
   address; wedgie.dev/safe works it out too and refuses if the two differ.
 

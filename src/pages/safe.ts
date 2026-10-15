@@ -11,6 +11,8 @@
 //     wallet, execute once enough have signed (a wallet sends it, packSignatures puts them together)
 //   - a new transaction (ETH, USDC or raw data), signed by the wedgie or the wallet, into the queue
 // Every transaction goes through propose(): one signature, into Safe's queue, where Safe{Wallet} sees it too.
+// Safe{Wallet} can't EXECUTE one the wedgie signed: it pastes a contract signature in place and the Safe
+// reverts GS021 (safe-wallet-monorepo#8808). packSignatures does it right, so execute here.
 // tools/safefork.mjs + safeprobe.mjs (a Base fork) and safelive.mjs (Base Sepolia, the real API) test it.
 // Nothing here remembers "the" Safe: a wedgie has many. The list comes from Safe's API (every chain), the
 // wedgie itself (safe_list: the Safes it signed for or was told about, wedgie-safe safe-4+; the page tells it
@@ -694,7 +696,7 @@ export function safe(main: HTMLElement) {
     const i = info!, n = i.owners.length;
     box.innerHTML = `<h2>Add your wedgie as an owner</h2>
       <p class="fine">An owner of this Safe does it from their browser wallet. ${i.threshold > 1
-        ? `This Safe needs ${i.threshold} signatures, so it goes to the queue below for the other owners to sign (here or in <a href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Safe{Wallet}</a>), then anyone executes it.`
+        ? `This Safe needs ${i.threshold} signatures, so it goes to the queue below for the other owners to sign (here or in <a href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Safe{Wallet}</a>), then anyone executes it here.`
         : "One signature is enough here, so it runs right away."}</p>
       <p>Then <select id="a-th"${dis()}>${threshOpts(n + 1, i.threshold)}</select> of ${n + 1} owners must sign. <button class="btn btn-green" id="a-go"${dis()}>Add it with my wallet</button></p>`;
     $("a-go").onclick = () => job(addSigner);
@@ -773,6 +775,7 @@ export function safe(main: HTMLElement) {
     const ready = /data-exec/.test(items);
     box.innerHTML = `<h2>${ready ? "Ready: press Execute" : "Waiting to sign"}</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
+      <p class="fine">Execute here. Safe{Wallet} can't run a transaction a wedgie signed yet (it fails with GS021, <a href="https://github.com/safe-global/safe-wallet-monorepo/issues/8808" target="_blank" rel="noopener">their bug</a>).</p>
       <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button>
         <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Queue in Safe{Wallet} ↗</a>
         <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/history")}" target="_blank" rel="noopener">History ↗</a></p>`;
@@ -881,7 +884,7 @@ export function safe(main: HTMLElement) {
     await load(true);
     toQueue();
     const u = queue.find((x) => x.safeTxHash === t.safeTxHash);
-    say(u && (u.confirmations || []).length >= (u.confirmationsRequired ?? info!.threshold) ? "Signed. That's enough: press Execute." : "Signed. It shows in Safe{Wallet} too.");
+    say(u && (u.confirmations || []).length >= (u.confirmationsRequired ?? info!.threshold) ? "Signed. That's enough: press Execute." : "Signed. Execute it here: Safe{Wallet} can't yet.");
   }
 
   /** After nonce n ran: the RPC and Safe's API catch up seconds later, so read again until both have moved on. */
