@@ -1,11 +1,12 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now
 //   POST {cart, sealed, pay, chain?}          a new order -> {id, token, url?} (url: Stripe Checkout)
-//   POST {id, token, tx?}                     its status; tx = a USDC payment to check (else the chain is searched)
-// A quote holds 10 minutes for USDC, 30 for card (catalog.ts QUOTE); then the order is 'expired'.
+//   POST {id, token, tx?, renew?}             its status; tx = a USDC payment to check (else the chain is searched);
+//                                             renew: an expired order quoted again at today's price
+// A quote holds 10 minutes (catalog.ts QUOTE); then the order is 'expired'.
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
-import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, type Order } from "./_shop.js";
+import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, extraNow, expireOld, late, rpc, type Order } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
@@ -65,8 +66,8 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   if ((o.status === "new" || o.status === "expired") && o.pay === "card" && o.stripe_session) {
     const s = await session(o.stripe_session);
     if (s.payment_status === "paid") { await markPaid(sql, o.id, s.id); o.status = "paid"; }
-    else if (s.status === "open" && o.status === "new") url = s.url || undefined;
-    else if (o.status === "new" && (s.status === "expired" || late(o))) { await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`; o.status = "expired"; }
+    else if (s.status === "open" && o.status === "new" && !late(o)) url = s.url || undefined;
+    else if (o.status === "new") o.status = await endCard(sql, o);
   }
   let tx = b.tx;
   if ((o.status === "new" || o.status === "expired") && o.pay === "usdc" && !tx) tx = await usdcFind(o).catch(() => null);
@@ -85,5 +86,37 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     } else why = r.why;
   }
   if (o.status === "new" && o.pay === "usdc" && late(o)) { await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`; o.status = "expired"; }
+  if (b.renew === true && o.status === "expired") {
+    const r = await renew(sql, o, origin);
+    if (typeof r === "string") return oops(r, 503);
+    Object.assign(o, r.o); url = r.url; why = undefined;
+  }
   return json({ ...publicView(o), url, why });
+}
+
+/** An expired order quoted again: today's price, a fresh 10 minutes, the same cart and sealed address. */
+async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: string): Promise<string | { o: Order; url?: string }> {
+  if (!o.sealed) return "That order can't be renewed: start over.";
+  if (o.pay === "card" && (await endCard(sql, o)) === "paid") return { o: { ...o, status: "paid" } };   // its old checkout: paid after all, or ended
+  await expireOld(sql);
+  const lines = cartLines(o.cart, await extraNow(sql));
+  const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
+  if (o.pay === "card") {
+    if (!open().card) return "Card checkout isn't open right now.";
+    const s = await checkout({ id: o.id, cart: o.cart, lines }, origin);
+    const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, stripe_session = ${s.id}
+      where id = ${o.id} and status = 'expired' returning *`;
+    return n ? { o: n as Order, url: s.url } : "Try again.";
+  }
+  if (!open().chains.includes(o.chain!)) return "USDC on that chain isn't open right now.";
+  const head = Number(BigInt(await rpc(o.chain!, "eth_blockNumber", [])));
+  for (let i = 0; i < 8; i++) {
+    const usdc = BigInt(cents) * 10_000n + BigInt(1 + Math.floor(Math.random() * 9999));
+    try {
+      const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, usdc = ${usdc.toString()}, from_block = ${head}
+        where id = ${o.id} and status = 'expired' returning *`;
+      return n ? { o: n as Order } : "Try again.";
+    } catch (e: any) { if (!/orders_open_usdc/.test(e?.message || "")) throw e; }
+  }
+  return "Busy: try again.";
 }

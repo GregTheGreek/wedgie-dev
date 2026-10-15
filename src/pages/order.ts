@@ -2,7 +2,8 @@
 // The address is sealed in this browser before it's sent (shop/seal.ts): our server, Stripe and the chain
 // never see it. Card = Stripe Checkout (payment only). USDC = a transfer on Base (a QR code for any phone
 // wallet, or this browser's wallet) for an amount whose last digits (under a cent) name the order; the server
-// finds it on chain. A quote holds 10 minutes (USDC) or 30 (card), with a countdown; then it's expired.
+// finds it on chain. A quote holds 10 minutes, with a countdown; then it's expired, and Refresh price
+// quotes it again at today's price.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
 import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
@@ -189,7 +190,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>
         <p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>`;
     }
-    if (v.status === "expired") h += `<p><b>Time ran out.</b> Nothing was charged.</p><p><a class="btn btn-green" href="/order">Start over</a></p>`;
+    if (v.status === "expired") h += `<p><b>Time ran out.</b> Nothing was charged.</p>
+      <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>`;
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
     if (v.status === "shipped") h += `<p class="good"><b>Shipped.</b> Your address is deleted.</p>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
@@ -202,6 +204,13 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     box.querySelector<HTMLButtonElement>("#o-copy")!.onclick = () => navigator.clipboard.writeText(link).then(() => say("Copied."));
     const send = box.querySelector<HTMLButtonElement>("#o-send");
     if (send) send.onclick = () => payWallet().catch((e) => { busy = false; paint(); say(msgOf(e), true); });
+    const renew = box.querySelector<HTMLButtonElement>("#o-renew");
+    if (renew) renew.onclick = async () => {
+      busy = true; paint();
+      try { v = await api({ id, token, renew: true }); if (v!.left != null) ends = Date.now() + v!.left; say(""); watch(); }
+      catch (e) { say(msgOf(e), true); }
+      busy = false; paint();
+    };
     const check = box.querySelector<HTMLButtonElement>("#o-check");
     if (check) check.onclick = () => {
       const tx = box.querySelector<HTMLInputElement>("#o-tx")!.value.trim();
@@ -246,12 +255,16 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
   }
 
   box.innerHTML = `<div class="safe-box recess"><p class="fine">Looking up your order.</p></div>`;
-  (async () => {
-    await refresh();
-    // Keep looking while it isn't paid, until the quote runs out: the server searches the chain each time.
+  // Keep looking while it isn't paid, until the quote runs out: the server searches the chain each time.
+  let watching = false;
+  async function watch() {
+    if (watching) return;
+    watching = true;
     for (let i = 0; i < 200 && (v as View | null)?.status === "new"; i++) {
       await sleep(5000);
       if (v!.pay === "usdc" || mem()[id]?.tx || i < 24 || Date.now() > ends) await refresh();
     }
-  })();
+    watching = false;
+  }
+  refresh().then(watch);
 }

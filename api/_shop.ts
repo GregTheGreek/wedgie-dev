@@ -6,7 +6,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, PAY_CHAINS, QUOTE, CARD_QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
+import { ITEMS, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -68,25 +68,41 @@ export type Order = {
 export const publicView = (o: Order) => ({
   id: o.id, cart: o.cart, lines: o.lines, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
   payTo: o.pay === "usdc" && o.status === "new" ? env("SHOP_PAY_TO") : undefined,
-  left: o.status === "new" ? Math.max(0, Date.parse(o.created) + (o.pay === "usdc" ? QUOTE : CARD_QUOTE) - Date.now()) : undefined,
+  left: o.status === "new" ? Math.max(0, Date.parse(o.created) + QUOTE - Date.now()) : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
 
-/** What every box costs over its list price right now (catalog.ts extraAt): from the paid orders. */
+/** What every box costs over its list price right now (catalog.ts extraAt): paid orders at their paying, open
+ * quotes at their making, so splitting a cart into orders saves nothing. */
 export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
-  const rows = await sql`select paid_at, cart from orders where status in ('paid', 'shipped') and paid_at > now() - interval '60 days'`;
-  return extraAt(rows.map((r: any) => ({ at: Date.parse(r.paid_at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
+  const rows = await sql`select coalesce(paid_at, created) as at, cart from orders
+    where (status in ('paid', 'shipped') and paid_at > now() - interval '60 days')
+    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)`;
+  return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
 }
 
 /** Unpaid orders whose quote ran out are 'expired' (the address stays till admin.ts deletes it: a USDC
- * transfer sent in time but seen late still pays it, usdcPaid checks the time). A USDC one gets 2 more
- * minutes first; expiring frees its amount's last digits for a new order. */
+ * transfer sent in time but seen late still pays it, usdcPaid checks the time; Refresh price quotes it
+ * again). A USDC one gets 2 more minutes first; expiring frees its amount's last digits for a new order.
+ * A card one's Stripe checkout is ended (endCard), so it can't be paid at the old price. */
 export const late = (o: Pick<Order, "pay" | "created">) =>
-  Date.now() > Date.parse(o.created) + (o.pay === "usdc" ? QUOTE + 120_000 : CARD_QUOTE);
+  Date.now() > Date.parse(o.created) + (o.pay === "usdc" ? QUOTE + 120_000 : QUOTE);
 export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
-  await sql`update orders set status = 'expired' where status = 'new' and (
-    (pay = 'usdc' and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval)
-    or (pay = 'card' and created < now() - ${`${CARD_QUOTE / 1000 + 60} seconds`}::interval))`;
+  await sql`update orders set status = 'expired' where status = 'new' and pay = 'usdc'
+    and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval`;
+  const cards = await sql`select id, stripe_session from orders where status = 'new' and pay = 'card'
+    and created < now() - ${`${QUOTE / 1000} seconds`}::interval`;
+  for (const o of cards as Order[]) await endCard(sql, o);
+}
+/** A card order's quote ran out: paid after all, or its Stripe checkout is ended and the order expired. */
+export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order, "id" | "stripe_session">): Promise<"paid" | "expired"> {
+  if (o.stripe_session) {
+    const s = await session(o.stripe_session);
+    if (s.payment_status === "paid") { await markPaid(sql, o.id, s.id); return "paid"; }
+    if (s.status === "open") await stripe(`checkout/sessions/${s.id}/expire`, {}).catch(() => {});   // paid just now? markPaid still takes it
+  }
+  await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`;
+  return "expired";
 }
 
 // ---- Stripe (its REST API; payment only: it is never sent an address) ----
@@ -106,7 +122,7 @@ export async function checkout(o: Pick<Order, "id" | "cart" | "lines">, origin: 
     mode: "payment",
     client_reference_id: o.id,
     "metadata[order]": o.id,
-    expires_at: String(Math.floor(Date.now() / 1000) + CARD_QUOTE / 1000),
+    expires_at: String(Math.floor(Date.now() / 1000) + 1800),   // Stripe's shortest; endCard ends it at QUOTE
     "payment_intent_data[metadata][order]": o.id,
     billing_address_collection: "auto",     // never "required", and no shipping_address_collection
     success_url: `${origin}/order/${o.id}`,

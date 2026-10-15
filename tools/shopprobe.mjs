@@ -1,7 +1,8 @@
 // /order end to end on a Base fork (anvil), with the shop's real server (api/, under `vite` on the dev
 // database branch) and the shipping computer's real orders.py:
 //   1. a USDC order through the page's form: what leaves the browser never holds the address in clear
-//   2. pay it from window.ethereum (an anvil account holding fork USDC): Paid once confirmed; the price goes up
+//   2. pay it from window.ethereum (an anvil account holding fork USDC): Paid once confirmed. The price went up
+//      when it was opened (open quotes count, so six orders can't each get the bottom price) and stays up
 //   3. a QR-style payment (any wallet, no hash pasted): the server finds it on chain
 //   4. a third order can't claim the first one's transaction
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
@@ -87,9 +88,12 @@ async function newOrder(kits = 0) {
 }
 
 // 1
+const extra0 = (await (await fetch(SITE + "/api/order")).json()).extra;
 const first = await newOrder(1);
 await shot("1-unpaid");
-const extra0 = (await (await fetch(SITE + "/api/order")).json()).extra, want = (6700 + 5700 + 500 + 2 * extra0) / 100;
+const extraOpen = (await (await fetch(SITE + "/api/order")).json()).extra;
+ok(extraOpen > extra0 + 900 && extraOpen <= extra0 + 1000, `an open order raises the price (${extra0} -> ${extraOpen} cents)`);
+const want = (6700 + 5700 + 500 + 2 * extra0) / 100;
 const amount = await page.locator("[data-copy]").first().getAttribute("data-copy");
 ok(Math.floor(Number(amount) * 100) / 100 === want && !/\.\d\d0000$/.test(amount), `asks for ${want} USDC plus a tag (${amount})`);
 ok(await page.locator(".order-qr svg").count() === 1 && /\d:\d\d/.test(await page.locator(".o-left").first().innerText()), "a QR code and a countdown");
@@ -103,7 +107,7 @@ await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
 await shot("2-paid");
 ok(true, "paid on chain, confirmed, shown");
 const extra1 = (await (await fetch(SITE + "/api/order")).json()).extra;
-ok(extra1 > extra0 + 900 && extra1 <= extra0 + 1000, `2 boxes sold: the price went up (${extra0} -> ${extra1} cents)`);
+ok(extra1 > extra0 + 900 && extra1 <= extra0 + 1000, `2 boxes sold: the price stays up (${extra0} -> ${extra1} cents)`);
 
 // 3: pay like a phone wallet from the QR code would: a plain transfer, nothing pasted
 const second = await newOrder();

@@ -12,7 +12,8 @@ export const SHIPS = "Ships within a week, US only.";
 
 // The price follows demand: each box sold adds BUMP to the next one (wedgies and kits together). That extra
 // melts away evenly, all of it 24 hours after the last sale, so a quiet day is back at $67. Whole cents,
-// rounded down. Only paid boxes count: a quote that's never paid moves nothing. `extra` comes from api/.
+// rounded down. Open quotes count too (at their making), so six orders cost what one order of six does; a quote
+// that runs out unpaid stops counting. `extra` comes from api/.
 export const BUMP = 500, MELT = 24 * 3600_000;
 export type Sale = { at: number; n: number };   // ms, boxes
 export function extraAt(sales: Sale[], now: number) {
@@ -42,10 +43,10 @@ export function cartOk(c: unknown): c is Cart {
 // USDC (Circle's own, 6 decimals) on each chain the shop takes, all paid to the shop's Safe (the same address
 // on every one: a chain goes here only once the Safe is deployed there). The server reads each chain through
 // SHOP_RPC_<chainId>. secs: block time, to find a payment's blocks; confirm: blocks to wait.
-// A USDC quote holds for QUOTE; a card one for Stripe's shortest checkout, 30 minutes.
+// A quote holds for QUOTE, USDC or card (a Stripe checkout lasts 30 minutes at least: the server ends it sooner).
 // The shop's Safe goes by its ENS name on the pay page.
 export const SHOP_ENS = { name: "wedgie.eth", address: "0xf5d3C7F2fACeAAc12A75d66e3BE4365A21d0d43C" };
-export const QUOTE = 10 * 60_000, CARD_QUOTE = 30 * 60_000;
+export const QUOTE = 10 * 60_000;
 export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: string; confirm: number; secs: number }> = {
   8453: { name: "Base", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", scan: "https://basescan.org", confirm: 3, secs: 2 },
   1: { name: "Ethereum", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", scan: "https://etherscan.io", confirm: 2, secs: 12 },
