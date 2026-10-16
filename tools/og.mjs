@@ -1,4 +1,4 @@
-// Renders the social card: tools/og/index.html (the 3D wedgie showing the wallet) -> public/img/og.png.
+// Renders the social card: tools/og/index.html (the 3D wedgie signing a Safe USDC send) -> public/img/og.png.
 // `cover` renders the X header instead: tools/cover/index.html -> public/img/cover.png (1500x500, at 2x).
 // Run the dev server first (npx vite), then: node tools/og.mjs [cover] [url]
 import { chromium } from "playwright-core";

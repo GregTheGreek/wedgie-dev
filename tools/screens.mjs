@@ -47,7 +47,11 @@ const shelf = (dir) => join(root, "community/clawdbotatg", dir);
   }
   try {
     // Safe signer: its home screen (its owner address), then a USDC send waiting for A
-    await boot("wedgie-safe", { "saves/safe/key.json": JSON.stringify({ x: "0x" + "11".repeat(32), y: "0x" + "22".repeat(32) }) });
+    // safe-14+: the key lives only in the chip, and the emulator has none: a stand-in ATECC608 (safechip.mjs's)
+    // whose slot 0 holds a locked key, so the app is in its normal state
+    const sc = readFileSync(join(root, "tools/safechip.mjs"), "utf8");
+    const atecc = eval("`" + sc.slice(sc.indexOf("const ATECC = `") + 15, sc.indexOf("`;", sc.indexOf("const ATECC = `"))).replace(/`/g, "\\`") + "`");
+    await boot("wedgie-safe", { "atecc.py": atecc });
     await wait(6000);
     await shot("safe-home");
     const Z = "0x" + "0".repeat(40);
