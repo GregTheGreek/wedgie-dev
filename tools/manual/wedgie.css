@@ -17,24 +17,28 @@ section { break-inside: avoid; margin-bottom: 14px; }
 .page { break-before: page; }
 
 /* cover */
-.cover { height: 9.6in; display: flex; flex-direction: column; break-after: page; margin: 0; }
+.cover { margin: 0 0 12px; }
 .kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 11pt; }
-.cover h1 { font-size: 50pt; margin: 6px 0 10px; }
-.cover .lede { font-size: 15pt; color: #474947; max-width: 5.8in; }
-.cover .hero { flex: 1; display: flex; align-items: center; justify-content: center; }
-.cover .hero img { max-height: 4.4in; border-radius: 18px; }
+.cover h1 { font-size: 38pt; margin: 4px 0 6px; }
+.cover .lede { font-size: 12.5pt; color: #474947; margin: 0 0 10px; }
+.cover .row { display: flex; gap: 16px; align-items: center; }
+.cover .hero img { height: 2.2in; border-radius: 14px; display: block; }
+.cover .qrbox { flex: 1; }
 .qrbox { display: flex; gap: 22px; align-items: center; padding: 18px; border: 2px solid #e2e2dd; border-radius: 18px; }
-.qrbox svg { width: 1.5in; height: 1.5in; flex-shrink: 0; }
+.qrbox svg { width: 1.2in; height: 1.2in; flex-shrink: 0; }
 .qrbox p { margin: 0; font-size: 13pt; }
-.qrbox p { margin: 4px 0; }
-.qrbox .big { font-size: 18pt; font-weight: 900; }
+.qrbox p { margin: 3px 0; font-size: 11pt; }
+.qrbox .big { font-size: 13.5pt; font-weight: 900; }
 
 /* the front of the wedgie, labeled */
-.front { width: 100%; height: auto; display: block; margin: 4px 0 8px; }
+.front { height: 1.85in; width: auto; display: block; margin: 0 auto 6px; }
 .front .lbl { font: 800 12px "Nunito"; fill: #1a1b1a; }
 .front .sub { font: 600 10.5px "Nunito"; fill: #6b6e6b; }
 .front .ln { stroke: #b9bab6; stroke-width: 1.2; fill: none; }
 
+.cols { columns: 2; column-gap: 24px; break-before: page; font-size: 10pt; }
+.cols h2 { font-size: 14pt; }
+.cols section { margin-bottom: 10px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
 .note { font-size: 10pt; padding: 8px 12px; border-radius: 10px; background: #eeeeea; border-left: 5px solid #22c452; }
 .note.bad { border-left-color: #e3312c; background: #fbeceb; }
@@ -42,5 +46,5 @@ dl { margin: 0; }
 dt { font-weight: 900; margin-top: 5px; }
 dd { margin: 1px 0 0; color: #474947; }
 .contact { display: flex; gap: 22px; align-items: center; padding: 18px; border-radius: 18px; background: #f4f4f1; }
-.contact svg { width: 1.1in; height: 1.1in; flex-shrink: 0; }
+.contact { padding: 12px; gap: 12px; } .contact svg { width: 0.85in; height: 0.85in; flex-shrink: 0; }
 .contact p { margin: 2px 0; }
