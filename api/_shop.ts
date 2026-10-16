@@ -52,6 +52,7 @@ export async function db() {
       token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
     await sql`alter table links add column if not exists email_enc text`;      // the email, locked (_mail.ts lock)
     await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
+    await sql`alter table links add column if not exists ip text`;   // ipOf, for login.ts IP_HOUR; gone with the link in a day
     await sql`alter table orders add column if not exists held boolean`;   // unused since 10-15 (dust could lock the stock)
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
   })().catch((e) => { ready = null; throw e; });

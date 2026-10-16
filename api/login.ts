@@ -6,11 +6,12 @@
 //                      the paid/shipped mails if it hasn't shipped)
 //   POST {signout}     the session ends
 // orders: [{id, token, at}]; the tokens (_mail.ts tokenOf) open each order's page. One link a minute, 5 an hour,
-// per email. Only hashes are stored.
-import { db, json, oops, same, env, sha256, randomHex } from "./_shop.js";
+// per email, and IP_HOUR an hour per IP (a script with a list of addresses would burn the inbox's daily quota). Only
+// hashes are stored (the IP's: _shop.ts ipOf, gone with its link after a day).
+import { db, json, oops, same, env, sha256, randomHex, ipOf } from "./_shop.js";
 import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock } from "./_mail.js";
 
-const SESSION_DAYS = 30;
+const SESSION_DAYS = 30, IP_HOUR = 10;
 type Sql = Awaited<ReturnType<typeof db>>;
 
 export async function POST(req: Request) {
@@ -18,14 +19,14 @@ export async function POST(req: Request) {
   try { b = await req.json(); } catch { return oops("Bad request."); }
   if (!env("SHOP_DATABASE_URL") || !env("SHOP_MAIL_KEY")) return oops("Sign in isn't open yet.", 503);
   const sql = await db();
-  if (typeof b?.email === "string") return ask(sql, b.email, new URL(req.url).origin);
+  if (typeof b?.email === "string") return ask(sql, b.email, new URL(req.url).origin, await ipOf(req));
   if (typeof b?.link === "string") return follow(sql, b.link);
   if (typeof b?.session === "string") return mine(sql, b.session, Array.isArray(b.claim) ? b.claim.slice(0, 50) : []);
   if (typeof b?.signout === "string") { await sql`delete from sessions where token_hash = ${await sha256(b.signout)}`; return json({ ok: true }); }
   return oops("Bad request.");
 }
 
-async function ask(sql: Sql, email: string, origin: string) {
+async function ask(sql: Sql, email: string, origin: string, ip: string) {
   if (email.length > 100 || !EMAIL.test(email.trim())) return oops("That isn't an email.");
   const h = await emailHash(email);
   await sql`delete from links where created < now() - interval '1 day'`;
@@ -33,8 +34,10 @@ async function ask(sql: Sql, email: string, origin: string) {
     from links where email_hash = ${h} and created > now() - interval '1 hour'`;
   if (r.minute) return oops("We just sent one. Wait a minute.", 429);
   if (r.hour >= 5) return oops("Too many tries. Wait an hour.", 429);
+  const [n] = await sql`select count(*)::int as n from links where ip = ${ip} and created > now() - interval '1 hour'`;
+  if (n.n >= IP_HOUR) return oops("Too many tries. Wait an hour.", 429);
   const token = randomHex(16);
-  await sql`insert into links (token_hash, email_hash, email_enc) values (${await sha256(token)}, ${h}, ${await lock(email.trim())})`;
+  await sql`insert into links (token_hash, email_hash, email_enc, ip) values (${await sha256(token)}, ${h}, ${await lock(email.trim())}, ${ip})`;
   try { await signinMail(email.trim(), `${origin}/signin#${token}`); } catch { return oops("Couldn't send the email. Try again soon.", 503); }
   return json({ ok: true });
 }
