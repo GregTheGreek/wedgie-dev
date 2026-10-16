@@ -13,7 +13,7 @@ p { margin: 0 0 7px; }
 ol, ul { margin: 0 0 7px; padding-left: 20px; }
 li { margin: 2px 0; }
 .url { font-weight: 900; color: #168c34; }
-section { break-inside: avoid; margin-bottom: 20px; }
+section { break-inside: avoid; margin-bottom: 14px; }
 .page { break-before: page; }
 
 /* cover */
@@ -26,7 +26,8 @@ section { break-inside: avoid; margin-bottom: 20px; }
 .qrbox { display: flex; gap: 22px; align-items: center; padding: 18px; border: 2px solid #e2e2dd; border-radius: 18px; }
 .qrbox svg { width: 1.5in; height: 1.5in; flex-shrink: 0; }
 .qrbox p { margin: 0; font-size: 13pt; }
-.qrbox .url { font-size: 17pt; margin-top: 4px; }
+.qrbox p { margin: 4px 0; }
+.qrbox .big { font-size: 18pt; font-weight: 900; }
 
 /* the front of the wedgie, labeled */
 .front { width: 100%; height: auto; display: block; margin: 4px 0 8px; }
@@ -38,7 +39,7 @@ section { break-inside: avoid; margin-bottom: 20px; }
 .note { font-size: 10pt; padding: 8px 12px; border-radius: 10px; background: #eeeeea; border-left: 5px solid #22c452; }
 .note.bad { border-left-color: #e3312c; background: #fbeceb; }
 dl { margin: 0; }
-dt { font-weight: 900; margin-top: 8px; }
+dt { font-weight: 900; margin-top: 5px; }
 dd { margin: 1px 0 0; color: #474947; }
 .contact { display: flex; gap: 22px; align-items: center; padding: 18px; border-radius: 18px; background: #f4f4f1; }
 .contact svg { width: 1.1in; height: 1.1in; flex-shrink: 0; }
