@@ -57,7 +57,7 @@ const PICOS = [
   { key: "digishuo", name: "Pink USB-C Pico (DIGISHUO)", about: "RP2040, 2 MB. Looks like the same board; headers to solder.", tested: false, price: 5.65,
     buy: [["https://www.amazon.com/dp/B0CDLDTV19", "Amazon 2-pack"]] },
   { key: "green", name: "Green USB-C Pico", about: "RP2040, 2 MB. Same layout as the official Pico, USB-C.", tested: false, price: 5.33,
-    buy: [["https://www.amazon.com/dp/B0H5VJM2PM", "Amazon 3-pack"], ["https://www.amazon.com/dp/B0FXWXFMP6", "Amazon single"]] },
+    buy: [["https://www.amazon.com/dp/B0H5VJM2PM", "Amazon 3-pack"], ["https://www.amazon.com/dp/B0FXWXFMP6", "Amazon single"], ["https://thepihut.com/products/rp2040-plus", "The Pi Hut (Waveshare RP2040 Plus)"]] },
 ];
 const picoOf = (k: string) => PICOS.find((p) => p.key === k);
 // The price: every part at what it costs us, plus a flat $30 for putting it together and shipping it.
