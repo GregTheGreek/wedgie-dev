@@ -12,6 +12,12 @@ Named on `/terms`, `/privacy`, the footer, and the pay box (`src/pages/legal.ts`
   price, not an audited wallet, kits built at your own risk, Colorado law.
 - `/privacy`: what's kept and when it's deleted. Keep it true when the shop's data changes.
 
+## Stock
+
+One count for wedgies and kits (the same parts). Set it on omen: `orders.py stock 40` (`orders.py stock` shows it).
+Each box paid since then, or held by an open quote, takes one; a canceled order gives its boxes back. Never set,
+or 0: the site says Sold out. `api/_shop.ts` `stockLeft`.
+
 ## Card
 
 Stripe Checkout (`api/_shop.ts`). Stripe never gets a shipping address.

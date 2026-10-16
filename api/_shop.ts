@@ -52,6 +52,7 @@ export async function db() {
       token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
     await sql`alter table links add column if not exists email_enc text`;      // the email, locked (_mail.ts lock)
     await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
+    await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -96,6 +97,20 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
     or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)`;
   return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
 }
+
+/** How many boxes are left to sell (wedgies and kits from one count: the same parts). The shipping computer sets
+ * it (orders.py stock N, admin.ts); each box paid since then, or held by an open quote, takes one; a canceled
+ * order gives its boxes back. Never set: 0, sold out. Can go below 0 for a moment when two orders race: claim. */
+export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<number> {
+  const [s] = await sql`select n, set_at from stock where id = 1`;
+  if (!s) return 0;
+  const [r] = await sql`select coalesce(sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)), 0)::int as used from orders
+    where (status in ('paid', 'shipped') and paid_at >= ${s.set_at})
+    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)`;
+  return s.n - r.used;
+}
+export const boxes = (c: Cart) => (c.wedgie || 0) + (c.kit || 0);
+export const soldOut = (left: number) => (left > 0 ? `Only ${left} left.` : "Sold out.");
 
 /** Unpaid orders whose quote ran out are 'expired' (the address stays till admin.ts deletes it: a USDC
  * transfer sent in time but seen late still pays it, usdcPaid checks the time; Refresh price quotes it

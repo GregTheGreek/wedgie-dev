@@ -175,7 +175,13 @@ export function home(main: HTMLElement): Promise<unknown> {
     surge.hidden = !extra;
     surge.textContent = `+${usd(extra)} right now`;
   };
-  fetch("/api/order").then((r) => r.json()).then((r) => { extra = r.extra || 0; showPrice(); }, () => {});
+  fetch("/api/order").then((r) => r.json()).then((r) => {
+    extra = r.extra || 0; showPrice();
+    if (r.left === 0) {     // sold out (api/_shop.ts stockLeft)
+      const go = main.querySelector<HTMLAnchorElement>("#order-go")!;
+      go.textContent = "Sold out"; go.classList.remove("btn-green"); go.removeAttribute("href"); go.setAttribute("aria-disabled", "true");
+    }
+  }, () => {});
   wire(price.parentElement!);
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
@@ -186,7 +192,8 @@ export function home(main: HTMLElement): Promise<unknown> {
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
     showPrice();
-    main.querySelector<HTMLAnchorElement>("#order-go")!.href = kit ? "/order?item=kit" : "/order";
+    const go = main.querySelector<HTMLAnchorElement>("#order-go")!;
+    if (go.hasAttribute("href")) go.href = kit ? "/order?item=kit" : "/order";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);

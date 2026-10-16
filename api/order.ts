@@ -1,5 +1,6 @@
 // /api/order
-//   GET                                       what's open: card, usdc; extra = cents over list price right now
+//   GET                                       what's open: card, usdc; extra = cents over list price right now;
+//                                             left = boxes in stock (_shop.ts stockLeft)
 //   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
 //   POST {id, token, tx?, renew?}             its status (a USDC one: what its deposit address holds); tx: old orders only;
 //                                             renew: an expired order quoted again at today's price
@@ -8,13 +9,15 @@
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
 import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
-import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, type Order } from "./_shop.js";
+import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, boxes, soldOut, type Order } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
 export async function GET() {
-  const extra = env("SHOP_DATABASE_URL") ? await extraNow(await db()).catch(() => 0) : 0;
-  return json({ ...open(), extra });
+  const sql = env("SHOP_DATABASE_URL") ? await db() : null;
+  const extra = sql ? await extraNow(sql).catch(() => 0) : 0;
+  const left = sql ? Math.max(0, await stockLeft(sql).catch(() => 0)) : 0;
+  return json({ ...open(), extra, left });
 }
 
 export async function POST(req: Request) {
@@ -36,6 +39,8 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   await expireOld(sql);
   const many = await tooMany(sql, ip);
   if (many) return oops(many, 429);
+  const left = await stockLeft(sql);
+  if (boxes(cart) > left) return oops(soldOut(left), 409);
   const lines = cartLines(cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
   const id = randomHex(6), token = await tokenOf(id), th = await sha256(token);
@@ -44,6 +49,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   if (b.pay === "card") {
     if (!o.card) return oops("Card checkout isn't open yet.", 503);
     await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, ip, email_hash, email_enc) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'card', ${b.sealed}, ${ip}, ${eh}, ${ee})`;
+    if (await raced(sql, id)) return oops(soldOut(0), 409);
     const s = await checkout({ id, cart, lines }, origin);
     await sql`update orders set stripe_session = ${s.id} where id = ${id}`;
     return json({ id, token, url: s.url });
@@ -55,9 +61,17 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     // Its own deposit address: whatever is sent there is this order's.
     const usdc = BigInt(cents) * 10_000n, deposit = depositOf(env("SHOP_PAY_TO"), id);
     await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, chain, usdc, deposit, ip, email_hash, email_enc) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, ${cents}, 'usdc', ${b.sealed}, ${chain}, ${usdc.toString()}, ${deposit}, ${ip}, ${eh}, ${ee})`;
+    if (await raced(sql, id)) return oops(soldOut(0), 409);
     return json({ id, token });
   }
   return oops("Pay by card or USDC.");
+}
+
+/** Two orders at once can take the last box: whoever finds the count below 0 after making theirs backs out. */
+async function raced(sql: Awaited<ReturnType<typeof db>>, id: string) {
+  if ((await stockLeft(sql)) >= 0) return false;
+  await sql`delete from orders where id = ${id} and status = 'new'`;
+  return true;
 }
 
 async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string, ip: string) {
@@ -110,6 +124,8 @@ async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: stri
   await expireOld(sql);
   const many = await tooMany(sql, ip);
   if (many) return many;
+  const left = await stockLeft(sql);
+  if (boxes(o.cart) > left) return soldOut(left);
   const lines = cartLines(o.cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
   if (o.pay === "card") {

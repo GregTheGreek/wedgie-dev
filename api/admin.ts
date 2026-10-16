@@ -3,8 +3,9 @@
 //   POST {id, tracking}          shipped: the buyer gets an email with the tracking number; then the sealed address,
 //                                their locked email, payer, transaction and Stripe session are wiped
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way
+//   POST {stock: n}              n boxes left to sell from now on (_shop.ts stockLeft); 0 = sold out
 // Each GET also marks paid the USDC orders whose deposit address now holds their price, and deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
-import { db, env, json, oops, same, settleDeposit, type Order } from "./_shop.js";
+import { db, env, json, oops, same, settleDeposit, stockLeft, type Order } from "./_shop.js";
 import { unlock, shippedMail, mailPaid } from "./_mail.js";
 
 const allowed = (req: Request) => {
@@ -24,15 +25,20 @@ export async function GET(req: Request) {
     if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});
   }
   const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created from orders where status = 'paid' order by paid_at`;
-  return json({ orders });
+  return json({ orders, left: await stockLeft(sql) });
 }
 
 export async function POST(req: Request) {
   if (!allowed(req)) return oops("no", 401);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }
-  if (typeof b?.id !== "string") return oops("Which order?");
   const sql = await db();
+  if (b?.stock !== undefined) {
+    if (!Number.isInteger(b.stock) || b.stock < 0 || b.stock > 10000) return oops("Stock is a whole number, 0 or more.");
+    await sql`insert into stock (id, n, set_at) values (1, ${b.stock}, now()) on conflict (id) do update set n = excluded.n, set_at = excluded.set_at`;
+    return json({ ok: true, left: await stockLeft(sql) });
+  }
+  if (typeof b?.id !== "string") return oops("Which order?");
   if (b.cancel === true) {
     const r = await sql`update orders set status = 'canceled', shipped_at = now(), sealed = null, email_enc = null, payer = null, tx = null, stripe_session = null
       where id = ${b.id} and status in ('new', 'paid') returning id`;

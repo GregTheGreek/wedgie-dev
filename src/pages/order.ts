@@ -185,6 +185,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     <p class="fine"><a href="/signin">Ordered before? Sign in</a></p>`;
 
   let extra = 0;     // cents over list right now (catalog.ts); the server works it out again at checkout
+  let left: number | null = null;     // boxes in stock (api/_shop.ts stockLeft); the server checks again too
   const paint = () => {
     box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => {
       const k = l.dataset.item as Item;
@@ -198,8 +199,10 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     el.textContent = lines.map((x) => `${x.qty} × ${ITEMS[x.item].name} at ${usd(x.cents)}`).join(" + ");
   };
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
-    const k = l.dataset.item as Item;
-    cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + Number(b.dataset.d)));
+    const k = l.dataset.item as Item, d = Number(b.dataset.d);
+    if (d > 0 && left != null && cart.wedgie + cart.kit >= left) return say(`Only ${left} left.`, true);
+    cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + d));
+    say("");
     paint();
   })));
   paint();
@@ -210,11 +213,12 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
   api().then((r) => {
-    shop = SEAL_KEY ? r : { card: false, usdc: false }; extra = r.extra || 0; paint();
+    shop = SEAL_KEY && r.left > 0 ? r : { card: false, usdc: false }; extra = r.extra || 0; left = r.left ?? 0;
+    paint();
     box.querySelectorAll<HTMLOptionElement>("#o-chain option").forEach((o) => { if (!r.chains?.includes(Number(o.value))) o.remove(); });   // only chains the server can read
   }, () => {}).finally(() => {
     card.disabled = !shop.card; crypto.disabled = !shop.usdc;
-    openEl.textContent = shop.card || shop.usdc ? "" : "Checkout opens soon.";
+    openEl.textContent = shop.card || shop.usdc ? (left! <= 5 ? `Only ${left} left.` : "") : left === 0 ? "Sold out." : "Checkout opens soon.";
     openEl.hidden = !openEl.textContent;
   });
 

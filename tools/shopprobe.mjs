@@ -9,6 +9,7 @@
 //   4. paid with the page closed: the shipping computer's list still finds it
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
 //   6. /api/admin refuses without the token; the deposits sweep to the Safe
+//   7. stock: never set = sold out; orders.py stock N; a cart bigger than what's left is refused; 0 = sold out
 // Needs anvil, ALCHEMY_API_KEY (or BASE_RPC) to fork from, uv or python3 with `cryptography`, Node 23+.
 // No SHOP_DATABASE_URL_DEV in .env? It runs on an in-memory Postgres (tools/neonlite.mjs).
 // Run: node tools/shopprobe.mjs [outdir]
@@ -92,6 +93,17 @@ async function newOrder(kits = 0) {
   return page.url().split("/").pop();
 }
 
+// 0: stock (api/_shop.ts stockLeft). Never set: sold out. The probe's 8 boxes: 2 + 1 + 1 + 1, 3 to spare.
+const env = { ...process.env, SHOP_URL: SITE, SHOP_ADMIN_TOKEN: ADMIN, SHOP_KEY: dir + "/key.pem" };
+const py = (...a) => { try { return execFileSync("uv", ["run", "--quiet", "--with", "cryptography", "python3", ORDERS_PY, ...a], { env, encoding: "utf8" }); }
+  catch { return execFileSync("python3", [ORDERS_PY, ...a], { env, encoding: "utf8" }); } };
+const leftNow = async () => (await (await fetch(SITE + "/api/order")).json()).left;
+ok(await leftNow() === 0, "stock never set: sold out");
+await page.goto(SITE + "/order");
+await page.getByText("Sold out.").waitFor();
+ok(await page.locator("#o-usdc").isDisabled() && await page.locator("#o-card").isDisabled(), "sold out: the pay buttons are off");
+ok(py("stock", "8").includes("8 left"), "orders.py stock 8");
+
 // 1
 const extra0 = (await (await fetch(SITE + "/api/order")).json()).extra;
 const first = await newOrder(1);
@@ -150,9 +162,7 @@ await send(dep3, price3);
 await rpc("anvil_mine", ["0x3"]);
 
 // 5
-const env = { ...process.env, SHOP_URL: SITE, SHOP_ADMIN_TOKEN: ADMIN, SHOP_KEY: dir + "/key.pem" };
-const py = (...a) => { try { return execFileSync("uv", ["run", "--quiet", "--with", "cryptography", "python3", ORDERS_PY, ...a], { env, encoding: "utf8" }); }
-  catch { return execFileSync("python3", [ORDERS_PY, ...a], { env, encoding: "utf8" }); } };
+ok(await leftNow() === 3, `5 boxes paid: 3 left (${await leftNow()})`);
 const list = py("list");
 ok(list.includes(first) && list.includes(NAME) && list.includes("Testville, CO 80202") && list.includes(second) && list.includes(third), "orders.py list opens the paid orders' addresses, the one paid with the page closed too");
 py("ship", first, "9400100000000000000001");
@@ -164,6 +174,19 @@ ok(!py("list").includes(first), "shipped: gone from the list (sealed address wip
 py("cancel", second);
 py("cancel", third);
 py("cancel", ethOrder);
+ok(await leftNow() === 6, `canceled orders give their boxes back: 6 left (${await leftNow()})`);
+
+// 5a: more than what's left is refused, by the page and by the server; 0 = sold out
+py("stock", "1");
+const tooBig = await fetch(SITE + "/api/order", { method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ cart: { wedgie: 2, kit: 0 }, sealed: "v1." + "a".repeat(60), email: "probe@example.com", pay: "usdc", chain: 8453 }) });
+ok(tooBig.status === 409 && (await tooBig.json()).error === "Only 1 left.", "a cart bigger than the stock: refused");
+await page.goto(SITE + "/order");
+await page.waitForFunction(() => !document.querySelector("#o-usdc").disabled);
+await page.locator('[data-item=kit] [data-d="1"]').click();
+ok(await page.getByText("Only 1 left.").count() > 0 && await page.locator('[data-item=kit] .n').innerText() === "0", "the page won't add more than what's left");
+py("stock", "0");
+ok(await leftNow() === 0, "orders.py stock 0: sold out");
 
 // 5b: sweep the deposits to the Safe: anyone may, nowhere else
 const D = await import("../src/shop/deposits.ts");
