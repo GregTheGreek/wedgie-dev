@@ -52,7 +52,7 @@ export async function db() {
       token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
     await sql`alter table links add column if not exists email_enc text`;      // the email, locked (_mail.ts lock)
     await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
-    await sql`alter table orders add column if not exists held boolean`;   // usdc: money reached its deposit, so it holds stock even expired
+    await sql`alter table orders add column if not exists held boolean`;   // unused since 10-15 (dust could lock the stock)
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
   })().catch((e) => { ready = null; throw e; });
   await ready;
@@ -101,15 +101,19 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
 
 /** How many boxes are left to sell (wedgies and kits from one count: the same parts). The shipping computer sets
  * it (orders.py stock N, admin.ts); each box paid since then, or held by an open quote, takes one; a canceled
- * order gives its boxes back, and so does an expired quote unless money reached it (held: it can still be paid).
- * Never set: 0, sold out. Can go below 0 when two orders race (order.ts raced backs one out) or when a quote paid
- * only after it expired, with nothing sent in time, lands on a sold-out shop: orders.py list then says oversold. */
+ * order gives its boxes back, and so does an expired quote. A card quote holds its box till its Stripe checkout
+ * can't be paid any more (CARD_HOLD), even if ending it early failed. Unpaid money never holds a box: a dust
+ * send can't lock the stock. Never set: 0, sold out. Can go below 0 when two orders race (order.ts raced backs
+ * one out) or when a quote paid in full only after it expired lands on a sold-out shop: orders.py list then
+ * says oversold (Austin, 10-15: OK). */
+export const CARD_HOLD = 31 * 60_000;   // checkout()'s expires_at, plus a minute
 export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<number> {
   const [s] = await sql`select n, set_at from stock where id = 1`;
   if (!s) return 0;
   const [r] = await sql`select coalesce(sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)), 0)::int as used from orders
     where (status in ('paid', 'shipped') and paid_at >= ${s.set_at})
-    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval) or (status = 'expired' and held)`;
+    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)
+    or (status = 'new' and pay = 'card' and created > now() - ${`${CARD_HOLD / 1000} seconds`}::interval)`;
   return s.n - r.used;
 }
 export const boxes = (c: Cart) => (c.wedgie || 0) + (c.kit || 0);
@@ -127,14 +131,22 @@ export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
     and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval`;
   const cards = await sql`select id, stripe_session from orders where status = 'new' and pay = 'card'
     and created < now() - ${`${QUOTE / 1000} seconds`}::interval`;
-  for (const o of cards as Order[]) await endCard(sql, o);
+  for (const o of cards as Order[]) await endCard(sql, o).catch(() => {});   // Stripe down: tried again next time
 }
-/** A card order's quote ran out: paid after all, or its Stripe checkout is ended and the order expired. */
-export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order, "id" | "stripe_session">): Promise<"paid" | "expired"> {
+/** A card order's quote ran out: paid after all, or its Stripe checkout is ended and the order expired. If Stripe
+ * won't end it, the order stays 'new' (still holding its box, stockLeft CARD_HOLD) and is tried again later. */
+export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order, "id" | "stripe_session">): Promise<"paid" | "expired" | "new"> {
   if (o.stripe_session) {
     const s = await session(o.stripe_session);
     if (s.payment_status === "paid") { await markPaid(sql, o.id, s.id); return "paid"; }
-    if (s.status === "open") await stripe(`checkout/sessions/${s.id}/expire`, {}).catch(() => {});   // paid just now? markPaid still takes it
+    if (s.status === "open") {
+      const done = await stripe(`checkout/sessions/${s.id}/expire`, {}).then(() => true, () => false);
+      if (!done) {
+        const again = await session(s.id).catch(() => null);   // paid or ended just now?
+        if (again?.payment_status === "paid") { await markPaid(sql, o.id, s.id); return "paid"; }
+        if (again?.status !== "expired") return "new";
+      }
+    }
   }
   await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`;
   return "expired";
@@ -208,10 +220,11 @@ export async function rpc(chain: number, method: string, params: unknown[]) {
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const topicOf = (a: string) => "0x" + a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 
-/** What this order's deposit address holds, in USDC units (6 decimals), on every chain the shop reads: the
- * address is the same on all of them, so the wrong chain still counts. USDC dollar for dollar; ETH at
- * Chainlink's ETH/USD on Base (skipped if that's over an hour old). Read a few blocks back (PAY_CHAINS confirm).
- * Swept funds are gone from it, but an order is marked paid before anything is swept. */
+/** What this order's deposit address got, in USDC units (6 decimals), on every chain the shop reads: the
+ * address is the same on all of them, so the wrong chain still counts. USDC: every transfer into it, ever (the
+ * address is this order's alone), so a sweep doesn't hide a payment; anyone may sweep (WedgieDeposits.sweep).
+ * ETH: what it holds now, at Chainlink's ETH/USD on Base (skipped if that's over an hour old); plain ETH leaves no
+ * log, so ETH swept before the order counts paid is missed (check the Safe by hand). Read PAY_CHAINS confirm back. */
 const ETH_USD = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70";   // Chainlink ETH/USD on Base, 8 decimals
 export async function usdcGot(o: Order): Promise<bigint> {
   const who = o.deposit!.toLowerCase().replace(/^0x/, "").padStart(64, "0");
@@ -220,8 +233,10 @@ export async function usdcGot(o: Order): Promise<bigint> {
     const c = PAY_CHAINS[chain];
     const head = BigInt(await rpc(chain, "eth_blockNumber", []));
     const at = "0x" + (head - BigInt(c.confirm) + 1n).toString(16);
-    const [usdc, wei] = await Promise.all([rpc(chain, "eth_call", [{ to: c.usdc, data: "0x70a08231" + who }, at]), rpc(chain, "eth_getBalance", ["0x" + who.slice(24), at])]);
-    return { usdc: BigInt(usdc), wei: BigInt(wei) };
+    const [logs, wei] = await Promise.all([
+      rpc(chain, "eth_getLogs", [{ address: c.usdc, fromBlock: "earliest", toBlock: at, topics: [TRANSFER, null, "0x" + who] }]) as Promise<{ data: string }[]>,
+      rpc(chain, "eth_getBalance", ["0x" + who.slice(24), at])]);
+    return { usdc: logs.reduce((t, l) => t + BigInt(l.data), 0n), wei: BigInt(wei) };
   }).map((p) => p.catch(() => ({ usdc: 0n, wei: 0n }))));   // a chain that can't be read counts 0 this time
   let got = per.reduce((t, x) => t + x.usdc, 0n);
   const wei = per.reduce((t, x) => t + x.wei, 0n);
@@ -235,7 +250,6 @@ export async function usdcGot(o: Order): Promise<bigint> {
 /** A deposit order that holds its price: paid. Returns whether it is now. */
 export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint }> {
   const got = await usdcGot(o);
-  if (got > 0n && !o.held) { await sql`update orders set held = true where id = ${o.id}`; o.held = true; }   // stockLeft
   if (got < BigInt(o.usdc!)) return { paid: false, got };
   const done = await sql`update orders set status = 'paid', paid_at = now() where id = ${o.id} and status in ('new', 'expired') returning id`;
   return { paid: done.length > 0 || o.status === "paid", got };

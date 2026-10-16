@@ -16,15 +16,15 @@ const TERMS = `
 <p>It's experimental. It's not a toy and it's not for kids under 14. It has small parts.</p>
 
 <h2>Crypto and keys</h2>
-<p>A wedgie can hold keys and sign transactions. It is <b>not an audited hardware wallet</b>. Software, firmware, and apps can have bugs. Don't keep more on it than you can afford to lose.</p>
+<p>A wedgie can hold keys and sign transactions. It is <b>not an audited hardware wallet</b>. Software, firmware, and apps can have bugs. Don't keep more on it than you can afford to lose. Anyone holding your wedgie can use its key: if you lose it, remove it as an owner of anything it signs for.</p>
 <p>We never see or keep your keys. We can't recover a lost key, a lost device, or lost funds, and we're not responsible for any transaction you sign.</p>
 
 <h2>Price and payment</h2>
-<p>The price moves with demand (shown on the order page). The price you see when you pay is the price you pay. Shipping is included. US only.</p>
-<p>Card payments go through Stripe. USDC payments go to wedgie.eth. A USDC payment has to be the exact amount, on time, on the network you picked.</p>
+<p>The price moves with demand (shown on the order page). The price you see when you pay is the price you pay. Shipping is included. US only. Up to 3 per order.</p>
+<p>Card payments go through Stripe. A USDC order gets its own address: send USDC (or ETH) there on Ethereum, Base, Arbitrum, or Optimism, in one send or several, until it adds up to the price. Only native USDC counts, not bridged USDC (USDC.e, USDbC). A full payment that arrives after the price ran out still counts. If you send too much, write to us and we'll send the extra back.</p>
 
 <h2>Shipping</h2>
-<p>We aim to ship within a week by USPS. If a package is lost, write to us and we'll help: file a claim or send another.</p>
+<p>We aim to ship within a week by USPS. If we can't, we'll email you and you can cancel for a full refund. If a package is lost, write to us and we'll help: file a claim or send another.</p>
 
 <h2>Broken or dead on arrival</h2>
 <p>If it arrives broken or doesn't work, write to ${MAIL} within 30 days of delivery. We'll replace it or refund you. That's our only promise about the hardware.</p>
@@ -32,16 +32,16 @@ const TERMS = `
 
 <h2>Refunds and cancels</h2>
 <p>Changed your mind before it ships? Write to us for a full refund. After it ships, we take back unused wedgies in their box within 30 days of delivery; you pay return shipping.</p>
-<p>Card refunds go back to your card. USDC refunds go back as USDC, to the address that paid.</p>
+<p>Card refunds go back to your card. USDC refunds go back as USDC, to an address you give us.</p>
 
 <h2>No warranty</h2>
-<p>EXCEPT FOR THE 30-DAY PROMISE ABOVE, WEDGIES, KITS, FIRMWARE, APPS, AND THIS SITE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. Some states don't allow this, so it may not all apply to you.</p>
+<p>EXCEPT FOR THE 30-DAY PROMISE ABOVE, WEDGIES, KITS, FIRMWARE, APPS, AND THIS SITE ARE PROVIDED "AS IS", WITH NO OTHER EXPRESS WARRANTY. ANY IMPLIED WARRANTY, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, LASTS ONLY 30 DAYS FROM DELIVERY. FIRMWARE, APPS, AND THIS SITE COME WITH NO WARRANTY OF ANY KIND. Some states don't allow this, so it may not all apply to you.</p>
 
 <h2>Limit of liability</h2>
 <p>TO THE EXTENT THE LAW ALLOWS, WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES, OR FOR LOST FUNDS, KEYS, DATA, OR PROFITS. OUR TOTAL LIABILITY FOR ANY ORDER IS AT MOST WHAT YOU PAID FOR IT. Some states don't allow this, so it may not all apply to you.</p>
 
 <h2>Apps</h2>
-<p>Apps on the shelf are written by other people, in their own repos. We check what we sign, but we don't promise any app works or is safe. Use them at your own risk.</p>
+<p>Apps on the shelf live in their own repos and may be written by other people. We check what we sign, but we don't promise any app works or is safe. Use them at your own risk.</p>
 
 <h2>The rest</h2>
 <p>Colorado law governs these terms. We may update them; the version on this page when you paid is the one that applies to your order.</p>

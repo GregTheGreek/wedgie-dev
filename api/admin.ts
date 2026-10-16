@@ -2,7 +2,7 @@
 //   GET                          every paid, unshipped order with its sealed address (only omen can open it)
 //   POST {id, tracking}          shipped: the buyer gets an email with the tracking number; then the sealed address,
 //                                their locked email, payer, transaction and Stripe session are wiped
-//   POST {id, cancel: true}      canceled (refund by hand), wiped the same way
+//   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
 //   POST {stock: n}              n boxes left to sell from now on (_shop.ts stockLeft); 0 = sold out
 // Each GET also marks paid the USDC orders whose deposit address now holds their price, and deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
 import { db, env, json, oops, same, settleDeposit, stockLeft, type Order } from "./_shop.js";
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   if (typeof b?.id !== "string") return oops("Which order?");
   if (b.cancel === true) {
     const r = await sql`update orders set status = 'canceled', shipped_at = now(), sealed = null, email_enc = null, payer = null, tx = null, stripe_session = null
-      where id = ${b.id} and status in ('new', 'paid') returning id`;
+      where id = ${b.id} and status in ('new', 'paid', 'expired') returning id`;
     return r.length ? json({ ok: true }) : oops("No open order with that id.", 404);
   }
   if (typeof b.tracking !== "string" || !/^[A-Z0-9]{10,40}$/i.test(b.tracking.replace(/\s/g, ""))) return oops("That isn't a tracking number.");

@@ -16,7 +16,8 @@ Named on `/terms`, `/privacy`, the footer, and the pay box (`src/pages/legal.ts`
 
 One count for wedgies and kits (the same parts). Set it on omen: `orders.py stock 40` (`orders.py stock` shows it).
 Each box paid since then, or held by an open quote, takes one; a canceled order gives its boxes back. Never set,
-or 0: the site says Sold out. An expired USDC quote that money already reached keeps its box. Shipped orders
+or 0: the site says Sold out. Up to 3 boxes per order. Unpaid money never holds a box (dust can't lock the stock);
+a card quote holds its box until its Stripe checkout can't be paid (31 min). Shipped orders
 deleted after 30 days come off the count, so their boxes aren't sold twice. A late USDC payment can still land on a
 sold-out shop: `orders.py list` then says OVERSOLD. `api/_shop.ts` `stockLeft`; test: `node tools/stocktest.mjs`.
 
@@ -55,7 +56,8 @@ address, so a refund (rare) is wedgie.eth calling `exec` to send it back from th
 
 - Sweep on each chain the money is on.
 - `sweep(salt, token)`: deploys the order's Deposit if needed and sends all of that token to wedgie.eth.
-  `token = 0` sweeps ETH. Anyone may call it; the money can't go anywhere else.
+  `token = 0` sweeps ETH. Anyone may call it; the money can't go anywhere else. An early sweep doesn't hide
+  a USDC payment (`usdcGot` counts transfers in), but swept ETH is missed: check the Safe by hand.
 - `sweepMany(salts, token)`: the same for many orders.
 - `exec(salt, to, value, data)`: **wedgie.eth only**. The Deposit makes any call, for anything `sweep`
   can't move (NFTs, odd tokens). Deposits accept ERC-721 and ERC-1155 safe transfers.

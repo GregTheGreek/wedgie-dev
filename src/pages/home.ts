@@ -171,7 +171,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   const showPrice = () => {
     // Always the list price, then the demand price on top, in green, when there is one (shop/why.ts).
     price.querySelector(".list")!.textContent = usd(ITEMS[item].cents);
-    const surge = main.querySelector<HTMLElement>(".surge")!;
+    const surge = price.parentElement!.querySelector<HTMLElement>("p.surge")!;   // not the hero button's *
     surge.hidden = !extra;
     surge.textContent = `+${usd(extra)} right now`;
   };

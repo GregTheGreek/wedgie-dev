@@ -7,7 +7,7 @@
 // quotes it again at today's price.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, SHIPS, STATES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, STATES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import qrcode from "qrcode-generator";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
@@ -201,6 +201,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
     const k = l.dataset.item as Item, d = Number(b.dataset.d);
     if (d > 0 && left != null && cart.wedgie + cart.kit >= left) return say(`Only ${left} left.`, true);
+    if (d > 0 && cart.wedgie + cart.kit >= MAX_BOXES) return say(`Up to ${MAX_BOXES} per order.`, true);
     cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + d));
     say("");
     paint();

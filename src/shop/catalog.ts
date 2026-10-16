@@ -7,7 +7,7 @@ export const ITEMS = {
 } as const;
 export type Item = keyof typeof ITEMS;
 export type Cart = Record<Item, number>;
-export const MAX_EACH = 10;
+export const MAX_EACH = 3, MAX_BOXES = 3;   // per order, wedgies and kits together (one person can't hold all the stock)
 export const SHIPS = "Ships within a week, US only.";
 
 // The price follows demand: each box sold adds BUMP to the next one (wedgies and kits together). That extra
@@ -37,7 +37,8 @@ export function cartOk(c: unknown): c is Cart {
   const o = c as Record<string, unknown>;
   if (!o || typeof o !== "object") return false;
   const ns = (Object.keys(ITEMS) as Item[]).map((k) => o[k]);
-  return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0);
+  return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0)
+    && ns.reduce((t: number, n) => t + (n as number), 0) <= MAX_BOXES;
 }
 
 // USDC (Circle's own, 6 decimals) on each chain the shop takes, all paid to the shop's Safe (the same address
