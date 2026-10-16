@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.47.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.48.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -41,9 +41,11 @@ A new wedgie says "no software" until an app is picked. That's normal.
 - **Firmware and shelf apps are signed by wedgie.dev.** The wedgie checks the signature before it installs.
 - **Keys are made inside the secure chip and never leave it.** Not to the computer, not to wedgie.dev.
 - **Limits, honestly:** an app runs with full power on the wedgie, so install only shelf apps or repos you
-  trust (a repo added by hand is not signed). If someone has the wedgie in hand, they can press its buttons.
+  trust (a repo added by hand is not signed). **A lost wedgie is a lost key:** someone holding it can reflash
+  it and sign with its key. If you lose it, remove it as an owner.
   A lost or broken chip takes its keys with it: keep a Safe's other owners or recovery in place.
-- **Safe Signer's key is locked for good** once made: not even an app can replace it (below).
+- **Safe Signer's key is locked for good** once made: nothing can replace it (below). Locked means it can't
+  be replaced, not that only Safe Signer can use it: any code running on the wedgie can sign with it.
 - Everything is open source (MIT): https://github.com/clawdbotatg/wedgie-dev
 
 ## Safe Signer
@@ -59,9 +61,11 @@ App: `clawdbotatg/wedgie-safe`, on the shelf. Page: https://wedgie.dev/safe.
   key before you got it. Don't use it: it can't be replaced, so the chip has to be swapped.
 - **Swap the chip** on the screen: the chip is locked with a key that isn't Safe Signer's. It never signs.
 - The key lives only in the chip, so a broken chip loses it: keep a second owner on your Safe.
-- Other apps use the chip's other key slots (trustm.md); they can't touch this one.
+- Other apps use the chip's other key slots (trustm.md); they can't replace this one, but code on the
+  wedgie can use it, so install only apps you trust.
 - **Signing:** the page sends the transaction, the wedgie works out the hash itself, shows what it does,
-  and signs only on green. Red says no.
+  and signs only on green. Red says no. A long one goes over more pages. A transaction that pays a gas
+  refund (gasPrice > 0) is refused: send it with gasPrice 0.
 - **Execute on wedgie.dev/safe.** Safe{Wallet} can't execute a transaction a wedgie signed: it fails with
   GS021 (Safe's bug, https://github.com/safe-global/safe-wallet-monorepo/issues/8808). Signing there is fine.
 - On chain the key is a passkey-style owner (P-256, Safe's WebAuthn signer). The wedgie shows its owner
@@ -170,7 +174,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.47","fw":"wedgie-0.3.47","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.48","fw":"wedgie-0.3.48","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

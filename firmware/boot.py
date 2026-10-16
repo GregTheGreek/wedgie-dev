@@ -1,4 +1,10 @@
 # Runs before main.py. The boot logo goes up first, before anything slow loads.
+# Ctrl-C off on the first line, as in main.py: MicroPython turns it on for boot.py too, and a Ctrl-C that stops
+# boot.py makes MicroPython skip main.py, lock and all, and hand a computer the REPL (found 10-15: a host waited
+# out a question, the no soft-reset the board, and Ctrl-C spammed through the restart got in). Nothing here may
+# end boot.py early: every failure is caught, BaseException too.
+import micropython
+micropython.kbd_intr(-1)
 try:
     import splash, os, machine, sys
     # A soft reset into an install (wedgie.save_job) keeps the screen: it already shows the install's
@@ -14,7 +20,7 @@ try:
     except Exception:                   # no job file; or no mem32 (the emulator)
         _keep = False
     splash.show(keep=_keep)
-except Exception as e:
+except BaseException as e:
     print("splash:", e)
 
 # The WEDGIE drive (wedgiedrive.py): a tiny read-only USB drive beside the serial port, with the
@@ -49,7 +55,7 @@ try:
         machine.mem32[_SCRATCH] = _MARK
         import wedgiedrive
         wedgiedrive.start()
-except Exception as e:
+except BaseException as e:
     print("drive:", e)
 import gc
 gc.collect()
