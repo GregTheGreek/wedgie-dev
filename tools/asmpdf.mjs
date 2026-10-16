@@ -22,7 +22,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
     <div class="qr">${qr}<p>Latest version, with photos:<br><span class="url">wedgie.dev/assemble</span></p></div>
   </div>
   <div class="need"><h2>You need</h2><ul>
-    <li>Raspberry Pi Pico</li><li>Screen board</li><li>Trust M chip board</li><li>4-wire cable with plug</li>
+    <li>RP2040 Pico with USB-C and headers</li><li>Screen board: Waveshare Pico-LCD-1.3</li><li>Chip board: Adafruit OPTIGA Trust M (4351)</li><li>STEMMA QT / Qwiic cable (4-pin JST-SH)</li>
     <li>Case: lid, base, joystick cap, 4 buttons</li><li>Wire cutters and strippers</li><li>Pliers</li><li>Electrical tape</li>
     <li>A stiff breadboard jumper wire</li><li>Tweezers</li><li>USB-C data cable</li><li>A computer with Chrome</li>
   </ul></div>

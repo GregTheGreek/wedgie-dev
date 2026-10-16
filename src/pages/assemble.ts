@@ -32,7 +32,7 @@ export const HEADER = (() => {
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
-    p: `The 4-wire cable (white, yellow, black, red) with its small plug, wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug, white, yellow, black, red), wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "Cut and strip the wires",
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
