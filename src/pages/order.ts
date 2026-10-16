@@ -132,7 +132,7 @@ async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   if (out) out.onclick = async () => {
     out.disabled = true;
     await login({ signout: s!.token }).catch(() => {});
-    [SESSION, MEM, LAST].forEach((k) => localStorage.removeItem(k));     // a public computer keeps nothing
+    [SESSION, MEM].forEach((k) => localStorage.removeItem(k));     // no session, no order links; the email stays to fill in Sign in
     location.replace("/");
   };
   yours.forEach(([i, o]) => api({ id: i, token: o.token }).then((v: View) => {

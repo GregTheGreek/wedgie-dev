@@ -6,7 +6,7 @@
 //      the session lists the orders; a 2nd send waits a minute; signed out, the session is dead
 //   4. an email with no orders still gets a link; signed in, it claims this device's order
 //   5. shipped: a mail with the tracking number; the locked email is wiped
-//   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out forgets all
+//   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out keeps only the email
 // Run: node tools/mailprobe.mjs
 import { createServer } from "vite";
 import { createServer as http } from "node:http";
@@ -25,7 +25,8 @@ const { db } = await vs.ssrLoadModule("/api/_shop.ts");
 const call = async (fn, body, headers = {}) => { const r = await fn(new Request("https://wedgie.dev/api/x", { method: "POST", headers, body: JSON.stringify(body) })); return { status: r.status, ...(await r.json()) }; };
 const mails = () => (existsSync(MAILS) ? readFileSync(MAILS, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 
-// 1
+// 1 (stock never set = sold out: give the probe some boxes)
+await call(admin.POST, { stock: 20 }, { authorization: "Bearer " + "t".repeat(40) });
 const base = { cart: { wedgie: 1, kit: 0 }, sealed: "v1." + "x".repeat(60), pay: "usdc", chain: 8453 };
 ok((await call(order.POST, base)).status === 400, "no email: refused");
 const EMAIL = "Buyer@Example.com";
@@ -88,6 +89,7 @@ const vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { st
 process.on("exit", () => vite.kill());
 for (let i = 0; ; i++) { try { if ((await fetch(SITE + "/api/order")).ok) break; } catch {} if (i > 100) throw new Error("vite didn't start"); await new Promise((r) => setTimeout(r, 300)); }
 const post = async (u, b) => (await fetch(SITE + u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) })).json();
+await fetch(SITE + "/api/admin", { method: "POST", headers: auth, body: JSON.stringify({ stock: 20 }) });
 const o2 = await post("/api/order", { ...base, email: "tabs@example.com" });
 ok(o2.id, "an order on the page's server");
 const cache = homedir() + "/Library/Caches/ms-playwright";
@@ -122,7 +124,9 @@ ok(await em.inputValue() === "tabs@example.com" && await em.getAttribute("readon
 await A.goto(SITE + "/orders");
 await A.locator("#o-out").click();
 await A.waitForURL(SITE + "/");
-ok(await A.evaluate(() => ["wedgie-session", "wedgie-orders", "wedgie-email"].every((k) => !localStorage.getItem(k))), "Sign out forgets everything here");
+ok(await A.evaluate(() => ["wedgie-session", "wedgie-orders"].every((k) => !localStorage.getItem(k))), "Sign out forgets the session and orders here");
+await A.goto(SITE + "/signin");
+ok(await A.inputValue("[name=email]") === "tabs@example.com", "Sign in again: your last email is filled in");
 await browser.close();
 
 console.log("mailprobe: all passed");
