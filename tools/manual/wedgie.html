@@ -1,0 +1,96 @@
+<!-- "You've got a wedgie": the user manual in every box. Edit the words here, then: node tools/userpdf.mjs
+     -> public/manual.pdf. Layout: wedgie.css. {{qr URL}} = a QR code, {{img PATH}} = a picture from the repo. -->
+
+<section class="cover">
+  <div class="kick">wedgie.dev</div>
+  <h1>You've got a wedgie.</h1>
+  <p class="lede">A pocket computer: a Raspberry Pi Pico, a screen, and a secure chip wedged in between. It runs one app at a time: games, tools, or a wallet signer.</p>
+  <div class="hero">{{img public/img/assemble/d19.webp}}</div>
+  <div class="qrbox">{{qr https://wedgie.dev/connect}}<div><p>Start here. Plug it in, open this in Chrome:</p><p class="url">wedgie.dev/connect</p></div></div>
+</section>
+
+<section>
+  <h2>The buttons</h2>
+  <svg class="front" viewBox="0 0 640 230">
+    <rect x="150" y="20" width="340" height="190" rx="28" fill="#fdfdfb" stroke="#cfcfca" stroke-width="2"/>
+    <circle cx="205" cy="115" r="26" fill="#8a8b8d"/><circle cx="200" cy="108" r="12" fill="#a9aaab"/>
+    <rect x="262" y="38" width="150" height="154" rx="8" fill="#1a1b1a"/>
+    <rect x="432" y="40" width="34" height="28" rx="7" fill="#22c452"/>
+    <rect x="432" y="78" width="34" height="28" rx="7" fill="#a9aaab"/>
+    <rect x="432" y="116" width="34" height="28" rx="7" fill="#a9aaab"/>
+    <rect x="432" y="154" width="34" height="28" rx="7" fill="#e3312c"/>
+    <path class="ln" d="M179 115H120"/><text class="lbl" x="114" y="111" text-anchor="end">Joystick</text>
+    <text class="sub" x="114" y="126" text-anchor="end">move, and press in</text>
+    <path class="ln" d="M470 54H520"/><text class="lbl" x="526" y="51">A: yes</text><text class="sub" x="526" y="64">green</text>
+    <path class="ln" d="M470 92H520"/><text class="lbl" x="526" y="96">B</text>
+    <path class="ln" d="M470 130H520"/><text class="lbl" x="526" y="134">X</text>
+    <path class="ln" d="M470 168H520"/><text class="lbl" x="526" y="165">Y: no</text><text class="sub" x="526" y="178">red</text>
+    <text class="sub" x="337" y="225" text-anchor="middle">USB-C on the side</text>
+  </svg>
+  <p><b>Green says yes. Red says no.</b> The joystick and gray buttons do whatever the app wants.</p>
+</section>
+
+<section>
+  <h2>Get started</h2>
+  <ol>
+    <li>Plug it into a computer with a <b>USB-C data cable</b> (some cables only charge).</li>
+    <li>A drive called <b>WEDGIE</b> shows up. Open <b>Open wedgie</b> on it, or go to <span class="url">wedgie.dev/connect</span> in <b>Chrome</b> or <b>Edge</b>. Safari and Firefox can't talk to USB.</li>
+    <li>Click <b>Connect</b> and pick your wedgie.</li>
+    <li>Pick an app. The wedgie asks <b>Install?</b> on its screen. Press <b>green</b>.</li>
+  </ol>
+  <p class="note">A new wedgie says <b>No software</b> until you pick an app. That's normal.</p>
+</section>
+
+<section>
+  <h2>Apps</h2>
+  <p>Games: Frog, Grove, Bunker, Blocks, 2048, Blackjack. Tools: Buttons, Keypad. And <b>Safe Signer</b>, a hardware signer for a Safe multisig. More every week.</p>
+  <p>Switch apps anytime at <span class="url">wedgie.dev/connect</span>. Game saves stay when you switch or update.</p>
+</section>
+
+<section>
+  <h2>Is it safe?</h2>
+  <ul>
+    <li><b>Plugging it in gives a computer nothing.</b> It's locked.</li>
+    <li><b>Nothing installs or signs without a press of green</b> on the wedgie itself. No website or program can press it.</li>
+    <li><b>Apps on the shelf and the firmware are signed</b> by wedgie.dev. The wedgie checks before it installs.</li>
+    <li><b>Keys are made inside the secure chip</b> and never leave it.</li>
+  </ul>
+  <p class="note bad">An app can do anything on the wedgie. Only install apps from the shelf, or code you trust.</p>
+</section>
+
+<section>
+  <h2>Safe Signer</h2>
+  <p>Makes your wedgie an owner of a Safe multisig. Install it, then go to <span class="url">wedgie.dev/safe</span>.</p>
+  <ul>
+    <li>The first time it opens, it says <b>No key</b>. Press green: the chip makes a key and <b>locks it for good</b>. Nobody ever sees it, not even us.</li>
+    <li>It shows what a transaction does. Green signs, red says no.</li>
+    <li>Keep a second owner on your Safe. If the chip breaks, its key is gone.</li>
+  </ul>
+  <p class="note bad">If Safe Signer shows an address the very first time you open it, someone made a key before you. Don't use it. Email us.</p>
+</section>
+
+<section>
+  <h2>Make your own app</h2>
+  <p>Go to <span class="url">wedgie.dev/code</span>. Write it yourself, or have your AI agent write it. Try it in the browser, then put it on your wedgie. Agents: read <span class="url">wedgie.dev/skill.md</span>.</p>
+</section>
+
+<section>
+  <h2>If something's off</h2>
+  <dl>
+    <dt>It doesn't show up on the computer</dt><dd>Try another cable (charge-only cables are common) and another USB port.</dd>
+    <dt>"No software"</dt><dd>Pick an app at wedgie.dev/connect.</dd>
+    <dt>An app is stuck or crashes when it starts</dt><dd>Hold <b>X</b> (the gray one next to red) while you plug it in. It starts without the app. Then pick another app.</dd>
+    <dt>"wedgie broke"</dt><dd>Press <b>B</b> to try again.</dd>
+    <dt>The page says the firmware is old</dt><dd>Click update and press green on the wedgie.</dd>
+    <dt>Still broken</dt><dd>Go to <span class="url">wedgie.dev/test</span> in Chrome. It wipes the wedgie, puts everything back on, and tests the screen, buttons and chip. Your game saves come back. It never touches the chip's keys. To wipe it, push a paperclip into the small hole in the base while you plug it in.</dd>
+  </dl>
+</section>
+
+<section>
+  <h2>Help</h2>
+  <div class="contact">{{qr mailto:wedgie@buidlguidl.com}}<div>
+    <p>Email <span class="url">wedgie@buidlguidl.com</span></p>
+    <p>Show it off: <b>@wedgiedev</b> on X.</p>
+    <p>Made by <b>BuidlGuidl</b>. Open source, MIT: <b>github.com/clawdbotatg/wedgie-dev</b></p>
+  </div></div>
+</section>

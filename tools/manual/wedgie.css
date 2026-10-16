@@ -1,0 +1,45 @@
+/* "You've got a wedgie": the user manual shipped in every box (tools/userpdf.mjs). */
+@font-face { font-family: "Nunito"; src: url("NUNITO") format("woff2"); font-weight: 200 1000; }
+@page { size: letter; margin: 0.55in 0.65in 0.65in; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 500 11pt/1.45 "Nunito", sans-serif; color: #1a1b1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+b { font-weight: 900; }
+h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
+h2 { font-size: 17pt; margin: 0 0 8px; display: flex; align-items: center; gap: 10px; }
+h2::before { content: ""; width: 14px; height: 14px; border-radius: 4px; background: #22c452; flex-shrink: 0; }
+section:nth-of-type(3n+2) h2::before { background: #6f7072; }
+section:nth-of-type(3n+3) h2::before { background: #e3312c; }
+p { margin: 0 0 7px; }
+ol, ul { margin: 0 0 7px; padding-left: 20px; }
+li { margin: 2px 0; }
+.url { font-weight: 900; color: #168c34; }
+section { break-inside: avoid; margin-bottom: 20px; }
+.page { break-before: page; }
+
+/* cover */
+.cover { height: 9.6in; display: flex; flex-direction: column; break-after: page; margin: 0; }
+.kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 11pt; }
+.cover h1 { font-size: 50pt; margin: 6px 0 10px; }
+.cover .lede { font-size: 15pt; color: #474947; max-width: 5.8in; }
+.cover .hero { flex: 1; display: flex; align-items: center; justify-content: center; }
+.cover .hero img { max-height: 4.4in; border-radius: 18px; }
+.qrbox { display: flex; gap: 22px; align-items: center; padding: 18px; border: 2px solid #e2e2dd; border-radius: 18px; }
+.qrbox svg { width: 1.5in; height: 1.5in; flex-shrink: 0; }
+.qrbox p { margin: 0; font-size: 13pt; }
+.qrbox .url { font-size: 17pt; margin-top: 4px; }
+
+/* the front of the wedgie, labeled */
+.front { width: 100%; height: auto; display: block; margin: 4px 0 8px; }
+.front .lbl { font: 800 12px "Nunito"; fill: #1a1b1a; }
+.front .sub { font: 600 10.5px "Nunito"; fill: #6b6e6b; }
+.front .ln { stroke: #b9bab6; stroke-width: 1.2; fill: none; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.note { font-size: 10pt; padding: 8px 12px; border-radius: 10px; background: #eeeeea; border-left: 5px solid #22c452; }
+.note.bad { border-left-color: #e3312c; background: #fbeceb; }
+dl { margin: 0; }
+dt { font-weight: 900; margin-top: 8px; }
+dd { margin: 1px 0 0; color: #474947; }
+.contact { display: flex; gap: 22px; align-items: center; padding: 18px; border-radius: 18px; background: #f4f4f1; }
+.contact svg { width: 1.1in; height: 1.1in; flex-shrink: 0; }
+.contact p { margin: 2px 0; }
