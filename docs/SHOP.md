@@ -16,7 +16,9 @@ Named on `/terms`, `/privacy`, the footer, and the pay box (`src/pages/legal.ts`
 
 One count for wedgies and kits (the same parts). Set it on omen: `orders.py stock 40` (`orders.py stock` shows it).
 Each box paid since then, or held by an open quote, takes one; a canceled order gives its boxes back. Never set,
-or 0: the site says Sold out. `api/_shop.ts` `stockLeft`.
+or 0: the site says Sold out. An expired USDC quote that money already reached keeps its box. Shipped orders
+deleted after 30 days come off the count, so their boxes aren't sold twice. A late USDC payment can still land on a
+sold-out shop: `orders.py list` then says OVERSOLD. `api/_shop.ts` `stockLeft`; test: `node tools/stocktest.mjs`.
 
 ## Card
 

@@ -128,17 +128,18 @@ async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: stri
   if (boxes(o.cart) > left) return soldOut(left);
   const lines = cartLines(o.cart, await extraNow(sql));
   const cents = lines.reduce((t, l) => t + l.qty * l.cents, 0);
-  if (o.pay === "card") {
-    if (!open().card) return "Card checkout isn't open right now.";
-    const s = await checkout({ id: o.id, cart: o.cart, lines }, origin);
-    const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, stripe_session = ${s.id}, ip = ${ip}
-      where id = ${o.id} and status = 'expired' returning *`;
-    return n ? { o: n as Order, url: s.url } : "Try again.";
-  }
-  if (!open().chains.includes(o.chain!)) return "USDC on that chain isn't open right now.";
-  // Its deposit address (an old exact-amount order gets one now): today's price.
-  const deposit = o.deposit || depositOf(env("SHOP_PAY_TO"), o.id);
-  const [n] = await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, usdc = ${(BigInt(cents) * 10_000n).toString()},
-    deposit = ${deposit}, ip = ${ip} where id = ${o.id} and status = 'expired' returning *`;
-  return n ? { o: n as Order } : "Try again.";
+  if (o.pay === "card" && !open().card) return "Card checkout isn't open right now.";
+  if (o.pay === "usdc" && !open().chains.includes(o.chain!)) return "USDC on that chain isn't open right now.";
+  // Reserve the boxes first (status 'new' holds stock), then check nobody raced us to them; only then a checkout.
+  // A USDC order keeps its deposit address (an old exact-amount order gets one now): today's price.
+  const deposit = o.pay === "usdc" ? o.deposit || depositOf(env("SHOP_PAY_TO"), o.id) : null;
+  const usdc = o.pay === "usdc" ? (BigInt(cents) * 10_000n).toString() : o.usdc;
+  const [n] = (await sql`update orders set status = 'new', created = now(), lines = ${JSON.stringify(lines)}, cents = ${cents}, usdc = ${usdc},
+    deposit = ${deposit}, stripe_session = null, ip = ${ip} where id = ${o.id} and status = 'expired' returning *`) as Order[];
+  if (!n) return "Try again.";
+  if ((await stockLeft(sql)) < 0) { await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`; return soldOut(0); }
+  if (o.pay === "usdc") return { o: n };
+  const s = await checkout({ id: o.id, cart: o.cart, lines }, origin);
+  await sql`update orders set stripe_session = ${s.id} where id = ${o.id}`;
+  return { o: { ...n, stripe_session: s.id }, url: s.url };
 }

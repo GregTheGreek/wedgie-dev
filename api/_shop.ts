@@ -52,6 +52,7 @@ export async function db() {
       token_hash text primary key, email_hash text not null, expires timestamptz not null)`;
     await sql`alter table links add column if not exists email_enc text`;      // the email, locked (_mail.ts lock)
     await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
+    await sql`alter table orders add column if not exists held boolean`;   // usdc: money reached its deposit, so it holds stock even expired
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
   })().catch((e) => { ready = null; throw e; });
   await ready;
@@ -77,7 +78,7 @@ export function same(a: string, b: string) {   // constant time
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
-  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null;
+  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; held?: boolean | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
@@ -100,13 +101,15 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
 
 /** How many boxes are left to sell (wedgies and kits from one count: the same parts). The shipping computer sets
  * it (orders.py stock N, admin.ts); each box paid since then, or held by an open quote, takes one; a canceled
- * order gives its boxes back. Never set: 0, sold out. Can go below 0 for a moment when two orders race: claim. */
+ * order gives its boxes back, and so does an expired quote unless money reached it (held: it can still be paid).
+ * Never set: 0, sold out. Can go below 0 when two orders race (order.ts raced backs one out) or when a quote paid
+ * only after it expired, with nothing sent in time, lands on a sold-out shop: orders.py list then says oversold. */
 export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<number> {
   const [s] = await sql`select n, set_at from stock where id = 1`;
   if (!s) return 0;
   const [r] = await sql`select coalesce(sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)), 0)::int as used from orders
     where (status in ('paid', 'shipped') and paid_at >= ${s.set_at})
-    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)`;
+    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval) or (status = 'expired' and held)`;
   return s.n - r.used;
 }
 export const boxes = (c: Cart) => (c.wedgie || 0) + (c.kit || 0);
@@ -232,6 +235,7 @@ export async function usdcGot(o: Order): Promise<bigint> {
 /** A deposit order that holds its price: paid. Returns whether it is now. */
 export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint }> {
   const got = await usdcGot(o);
+  if (got > 0n && !o.held) { await sql`update orders set held = true where id = ${o.id}`; o.held = true; }   // stockLeft
   if (got < BigInt(o.usdc!)) return { paid: false, got };
   const done = await sql`update orders set status = 'paid', paid_at = now() where id = ${o.id} and status in ('new', 'expired') returning id`;
   return { paid: done.length > 0 || o.status === "paid", got };

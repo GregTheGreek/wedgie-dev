@@ -16,8 +16,11 @@ const allowed = (req: Request) => {
 export async function GET(req: Request) {
   if (!allowed(req)) return oops("no", 401);
   const sql = await db();
-  await sql`delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
-    or (status in ('new', 'expired') and created < now() - interval '30 days')`;
+  // The shipped boxes deleted here come off the stock count too, so stockLeft doesn't forget them and hand them out again.
+  await sql`with gone as (delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
+    or (status in ('new', 'expired') and created < now() - interval '30 days') returning cart, status, paid_at)
+    update stock set n = n - coalesce((select sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)) from gone
+      where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id = 1`;
   // USDC sent to an order's deposit address after its buyer left the page still pays it
   const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')`) as Order[];
   for (const o of open) {
