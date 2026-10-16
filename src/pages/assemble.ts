@@ -40,7 +40,7 @@ export const STEPS: Step[] = [
   { t: "Lay out the screen board",
     p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
     d: "04", ph: ["04-board-and-guide"], art: HEADER,
-    warn: `Never put anything in the 4th socket on the right row.` },
+    warn: `Never put anything in the 4th socket on the right row. Your own cable? Its colors may differ: go by the wire's place in the plug (step 9), not its color.` },
   { t: "Push in white and yellow",
     p: `Twist the strands at each tip tight, so each acts like one solid wire. Push <b>white into the 3rd</b> and <b>yellow into the 5th</b> socket on the right row.`,
     d: "05", ph: ["05-white-yellow-in-header"] },
