@@ -11,7 +11,7 @@
 import { db, json, oops, same, env, sha256, randomHex, ipOf } from "./_shop.js";
 import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock } from "./_mail.js";
 
-const SESSION_DAYS = 30, IP_HOUR = 10;
+const SESSION_DAYS = 30, IP_HOUR = 5;
 type Sql = Awaited<ReturnType<typeof db>>;
 
 export async function POST(req: Request) {
