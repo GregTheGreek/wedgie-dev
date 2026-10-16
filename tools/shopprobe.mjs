@@ -8,7 +8,7 @@
 //      ETH by mistake counts at Chainlink's price
 //   4. paid with the page closed: the shipping computer's list still finds it
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
-//   6. /api/admin refuses without the token; the deposits sweep to the Safe
+//   6. /api/admin refuses without the token; the deposits sweep to the Safe; a sweep before it's paid hides nothing
 //   7. stock: never set = sold out; orders.py stock N; a cart bigger than what's left is refused; 0 = sold out
 // Needs anvil, ALCHEMY_API_KEY (or BASE_RPC) to fork from, uv or python3 with `cryptography`, Node 23+.
 // No SHOP_DATABASE_URL_DEV in .env? It runs on an in-memory Postgres (tools/neonlite.mjs).
@@ -55,6 +55,7 @@ await rpc("anvil_dealERC20", [me, USDC, "0x" + (1000n * 10n ** 6n).toString(16)]
 
 const vite = spawn("npx", ["vite", "--port", String(VPORT), "--strictPort"], { stdio: ["ignore", "pipe", "inherit"],
   env: { ...process.env, VITE_SEAL_KEY: pub, SHOP_PAY_TO: PAY_TO, SHOP_ADMIN_TOKEN: ADMIN, SHOP_RPC_8453: ARPC, STRIPE_SECRET_KEY: "",
+    SHOP_MAIL_FILE: dir + "/mails.jsonl",   // never real mail: .env holds the live Gmail login
     SHOP_DATABASE_URL_DEV: process.env.SHOP_DATABASE_URL_DEV || "pglite" } });
 kids.push(vite);
 for (let i = 0; ; i++) { try { if ((await fetch(SITE + "/api/order")).ok) break; } catch {} if (i > 100) throw new Error("vite didn't start"); await sleep(300); }
@@ -199,6 +200,20 @@ const enc = "0x7654b892" + "40".padStart(64, "0") + USDC.slice(2).toLowerCase().
 await rpc("eth_sendTransaction", [{ from: me, to: factory, data: enc, gas: "0x200000" }]);
 await rpc("anvil_mine", ["0x1"]);
 ok(held > 0n && (await bal(PAY_TO)) === held && (await bal(dep1)) + (await bal(dep2)) + (await bal(dep3)) === 0n, `sweep: all ${held} went to the Safe`);
+
+// 5c: anyone sweeping an unpaid order's deposit early doesn't hide what was sent (usdcGot counts transfers in)
+py("stock", "1");
+const api = (b) => fetch(SITE + "/api/order", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json());
+const early = await api({ cart: { wedgie: 1, kit: 0 }, sealed: "v1." + "a".repeat(60), email: "probe@example.com", pay: "usdc", chain: 8453 });
+await send(D.depositOf(PAY_TO, early.id), 20_000_000n);
+await rpc("anvil_mine", ["0x3"]);
+const one = "0x7654b892" + "40".padStart(64, "0") + USDC.slice(2).toLowerCase().padStart(64, "0") + "1".padStart(64, "0") + D.saltOf(early.id).slice(2);
+await rpc("eth_sendTransaction", [{ from: me, to: factory, data: one, gas: "0x200000" }]);
+await rpc("anvil_mine", ["0x3"]);
+ok((await bal(D.depositOf(PAY_TO, early.id))) === 0n, "swept before it was paid");
+const seen = await api({ id: early.id, token: early.token });
+ok(seen.got === "20000000" && seen.status === "new", `the order still counts the 20 USDC sent (got ${seen.got})`);
+py("cancel", early.id);
 
 // 6
 ok((await fetch(SITE + "/api/admin")).status === 401 && (await fetch(SITE + "/api/admin", { headers: { authorization: "Bearer x" } })).status === 401, "/api/admin needs the token");
