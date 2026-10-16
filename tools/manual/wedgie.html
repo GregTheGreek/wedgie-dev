@@ -19,22 +19,29 @@
 <section>
   <h2>The buttons</h2>
   <svg class="front" viewBox="0 0 640 230">
+    <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#168c34"/></marker></defs>
     <rect x="150" y="20" width="340" height="190" rx="28" fill="#fdfdfb" stroke="#cfcfca" stroke-width="2"/>
     <circle cx="205" cy="115" r="26" fill="#8a8b8d"/><circle cx="200" cy="108" r="12" fill="#a9aaab"/>
+    <!-- the wedgie's real update question (firmware/ui.py ask): waistband, the question, the version, yes/no bars -->
     <rect x="262" y="38" width="150" height="154" rx="8" fill="#1a1b1a"/>
+    <svg x="267" y="43" width="140" height="144" viewBox="0 0 240 240" preserveAspectRatio="none">
+      <rect width="240" height="240" fill="#fff"/>
+      <rect y="10" width="240" height="5" fill="#22c452"/><rect y="19" width="240" height="5" fill="#a9aaab"/><rect y="28" width="240" height="5" fill="#e3312c"/>
+      <text class="scr" x="120" y="78" font-size="24" text-anchor="middle">Update firmware?</text>
+      <text class="scr" x="120" y="136" font-size="40" text-anchor="middle">0.3.48</text>
+      <rect y="184" width="240" height="26" fill="#22c452"/><text class="scr" x="120" y="204" font-size="20" fill="#fff" text-anchor="middle">yes</text>
+      <rect y="214" width="240" height="26" fill="#e3312c"/><text class="scr" x="120" y="234" font-size="20" fill="#fff" text-anchor="middle">no</text>
+    </svg>
     <rect x="432" y="40" width="34" height="28" rx="7" fill="#22c452"/>
     <rect x="432" y="78" width="34" height="28" rx="7" fill="#a9aaab"/>
     <rect x="432" y="116" width="34" height="28" rx="7" fill="#a9aaab"/>
     <rect x="432" y="154" width="34" height="28" rx="7" fill="#e3312c"/>
-    <path class="ln" d="M179 115H120"/><text class="lbl" x="114" y="111" text-anchor="end">Joystick</text>
-    <text class="sub" x="114" y="126" text-anchor="end">move, and press in</text>
-    <path class="ln" d="M470 54H520"/><text class="lbl" x="526" y="51">A: yes</text><text class="sub" x="526" y="64">green</text>
-    <path class="ln" d="M470 92H520"/><text class="lbl" x="526" y="96">B</text>
-    <path class="ln" d="M470 130H520"/><text class="lbl" x="526" y="134">X</text>
-    <path class="ln" d="M470 168H520"/><text class="lbl" x="526" y="165">Y: no</text><text class="sub" x="526" y="178">red</text>
-    <text class="sub" x="337" y="225" text-anchor="middle">USB-C on the side</text>
+    <path class="ln" d="M179 115H120"/><text class="lbl" x="114" y="119" text-anchor="end">Joystick</text>
+    <path d="M560 54H478" stroke="#168c34" stroke-width="4" fill="none" marker-end="url(#ah)"/>
+    <text class="lbl big" x="566" y="59">Yes</text>
+    <path class="ln" d="M470 168H520"/><text class="lbl big" x="526" y="173">No</text>
   </svg>
-  <p><b>Green says yes. Red says no.</b> The joystick and gray buttons do whatever the app wants.</p>
+  <p><b>Green says yes. Red says no.</b> When the wedgie asks, like here, press green to update. The joystick and gray buttons do whatever the app wants.</p>
 </section>
 
 <section>
@@ -89,8 +96,8 @@
     <dt>The screen doesn't light up</dt><dd>Turn the cable around: swap which end goes in the wedgie. Some only work one way. Still dark? Try another cable.</dd>
     <dt>It doesn't show up on the computer</dt><dd>Try another cable (charge-only cables are common) and another USB port.</dd>
     <dt>"No software"</dt><dd>Pick an app at wedgie.dev/connect.</dd>
-    <dt>An app is stuck or crashes when it starts</dt><dd>Hold <b>X</b> (the gray one next to red) while you plug it in. It starts without the app. Then pick another app.</dd>
-    <dt>"wedgie broke"</dt><dd>Press <b>B</b> to try again.</dd>
+    <dt>An app is stuck or crashes when it starts</dt><dd>Hold the <b>gray button next to red</b> while you plug it in. It starts without the app. Then pick another app.</dd>
+    <dt>"wedgie broke"</dt><dd>Press the <b>gray button next to green</b> to try again.</dd>
     <dt>The page says the firmware is old</dt><dd>Click update and press green on the wedgie.</dd>
     <dt>Still broken</dt><dd>Go to <span class="url">wedgie.dev/test</span> in Chrome. It wipes the wedgie, puts everything back on, and tests the screen, buttons and chip. Your game saves come back. It never touches the chip's keys. To wipe it, push a paperclip into the small hole in the base while you plug it in.</dd>
   </dl>

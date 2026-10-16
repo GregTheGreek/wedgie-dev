@@ -34,6 +34,8 @@ section { break-inside: avoid; margin-bottom: 14px; }
 .front { height: 1.85in; width: auto; display: block; margin: 0 auto 6px; }
 .front .lbl { font: 800 12px "Nunito"; fill: #1a1b1a; }
 .front .sub { font: 600 10.5px "Nunito"; fill: #6b6e6b; }
+.front .lbl.big { font-size: 15px; font-weight: 900; }
+.front .scr { font-family: "DM Mono", monospace; font-weight: 700; fill: #1a1b1a; }
 .front .ln { stroke: #b9bab6; stroke-width: 1.2; fill: none; }
 
 .cols { columns: 2; column-gap: 24px; break-before: page; font-size: 10pt; }
