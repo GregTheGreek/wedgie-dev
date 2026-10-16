@@ -1,4 +1,4 @@
-/* The printed assembly manual (tools/asmpdf.mjs). Letter, 4 pages: a short cover, then the steps two across, drawing left, words right. */
+/* The printed assembly manual (tools/asmpdf.mjs). Letter, 3 pages: a short cover, then the steps two across, drawing left, words right. */
 @font-face { font-family: "Nunito"; src: url("NUNITO") format("woff2"); font-weight: 200 1000; }
 @font-face { font-family: "DM Mono"; src: url("DMMONO") format("woff2"); font-weight: 500; }
 @page { size: letter; margin: 0.45in 0.45in 0.55in; }
@@ -23,13 +23,13 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .need li { break-inside: avoid; }
 
 /* steps */
-.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 10px; }
-.step { break-inside: avoid; border: 1.5px solid #e2e2dd; border-radius: 12px; padding: 8px; display: grid; grid-template-columns: 1.5in 1fr; gap: 9px; align-items: start; }
-.step.wide { grid-column: span 2; grid-template-columns: 1.5in 1fr 1.5fr; }
+.steps { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 9px; }
+.step { break-inside: avoid; border: 1.5px solid #e2e2dd; border-radius: 12px; padding: 6px; display: grid; grid-template-columns: 1.3in 1fr; gap: 8px; align-items: start; }
+.step.wide { grid-column: span 2; grid-template-columns: 1.3in 1fr 1.3fr; }
 .step.wide .copy { display: contents; }
 .step.wide .copy > :not(.art) { grid-column: 2; }
 .step.wide .art { grid-column: 3; grid-row: 1 / span 4; margin: 0; }
-.draw { height: 1.5in; display: flex; align-items: center; justify-content: center; background: #faf8f4; border-radius: 8px; overflow: hidden; grid-row: 1 / span 4; }
+.draw { height: 1.3in; display: flex; align-items: center; justify-content: center; background: #faf8f4; border-radius: 8px; overflow: hidden; grid-row: 1 / span 4; }
 .draw img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .head { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
 .num { flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; color: #fff; font-weight: 900; font-size: 9.5pt;
@@ -40,7 +40,7 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .note { font-size: 8pt; padding: 4px 7px; border-radius: 7px; background: #eeeeea; border-left: 4px solid #22c452; }
 .note.bad { border-left-color: #e3312c; background: #fbeceb; }
 .art { margin: 2px 0 4px; }
-.header-art { width: 100%; max-height: 1.7in; display: block; }
+.header-art { width: 100%; max-height: 1.5in; display: block; }
 .header-art .strip { fill: #2a2b2c; }
 .header-art .hole { fill: #121313; stroke: #3c3d3f; stroke-width: 1.5; }
 .header-art .hole.w-white { fill: #fdfdfb; stroke: #9a9c99; stroke-width: 2.5; }
@@ -56,8 +56,8 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .header-art .rn { font: 800 10px "Nunito"; fill: #6f7072; }
 .header-art .wl { font: 900 14px "Nunito"; fill: #168c34; }
 
-/* trouble: the grid's last cells */
-.trouble { grid-column: span 2; columns: 2; column-gap: 20px; break-inside: avoid; background: #f4f4f1; border-radius: 12px; padding: 10px 12px; }
-.trouble h2 { font-size: 12pt; margin-bottom: 2px; column-span: all; }
+/* trouble: the grid's last cell, beside step 24 */
+.trouble { break-inside: avoid; background: #f4f4f1; border-radius: 12px; padding: 10px 12px; }
+.trouble h2 { font-size: 12pt; margin-bottom: 2px; }
 .trouble dt { font-weight: 900; margin-top: 5px; }
 .trouble dd { margin: 1px 0 0; color: #474947; }
