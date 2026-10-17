@@ -1,4 +1,4 @@
-// The printed assembly manual: node tools/asmpdf.mjs  ->  public/assemble.pdf (linked from /assemble). 3 pages.
+// The printed assembly manual: node tools/asmpdf.mjs  ->  public/assemble.pdf (linked from /assemble). 4 pages.
 // Words, steps and drawings come from src/pages/assemble.ts, same as the web page: edit there.
 // Print layout: tools/manual/manual.css. The cover and last page: below.
 import { createServer } from "vite";
