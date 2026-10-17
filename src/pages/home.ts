@@ -147,6 +147,10 @@ export function home(main: HTMLElement): Promise<unknown> {
     <a class="btn btn-lg" href="/code">Create software</a>
     <a class="btn btn-lg" href="/safe">Safe</a>
   </section>
+
+  <section id="teaser" class="sec teaser">
+    <video controls playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
+  </section>
 `;
 
   const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, intro: true, eager: true, side: 1, fallback: { kind: "off" } });
