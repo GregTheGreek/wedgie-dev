@@ -44,8 +44,9 @@ app.innerHTML = `
 <footer class="foot">
   <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
   <p>Hardware, case, firmware, and this site are MIT licensed. Build it, fork it, sell it.</p>
+  <p><a class="btn btn-sm" href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">Code on GitHub →</a></p>
   <p class="fine">Sold by BuidlGuidl DAO LLC · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:wedgie@buidlguidl.com">wedgie@buidlguidl.com</a></p>
-  <p class="fine"><a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">wedgie-dev</a> ·
+  <p class="fine"><a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">site + firmware</a> ·
   <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">case</a> ·
   <a href="https://github.com/austintgriffith/picowallet" target="_blank" rel="noopener">picowallet</a></p>
 </footer>
