@@ -1,4 +1,4 @@
-# Packs the /assemble images: drawings (gpt-image-2.5-sunburst, one per step, made from Austin's photos)
+# Packs the /assemble images: drawings (tools/asmdraw.py, one per step, made from Austin's photos)
 # and the photos themselves (clawd-pico-case/assembly/photos) into public/img/assemble/.
 #   python3 tools/asmimg.py <drawings dir with sNN.png> <photos dir>
 import sys, glob, os
