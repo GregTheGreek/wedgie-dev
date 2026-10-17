@@ -81,3 +81,9 @@ ORDERS_PY=<wedgie-shipping>/orders.py node tools/shopprobe.mjs  # the whole shop
 
 Orders from before 2026-10-15 were paid straight to wedgie.eth with an exact amount (`usdcPaid`,
 `usdcFind`). They still work. Renewing one gives it a deposit address.
+
+## Checkout counts
+
+Where people stop. A number per day per step or error (`src/shop/count.ts`, `api/count.ts`): no IP, cookie, id, or typed text.
+An expired order asks "Didn't buy? Why:" with 4 buttons. Read: `node tools/funnel.mjs [days]`.
+Counting never waits or throws, so it can't break checkout.

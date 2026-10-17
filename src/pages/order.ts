@@ -12,6 +12,7 @@ import qrcode from "qrcode-generator";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
+import { count, errKey } from "../shop/count";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
@@ -47,7 +48,7 @@ export function order(main: HTMLElement) {
   </section>`;
   const body = main.querySelector<HTMLElement>("#o-body")!;
   const msgEl = main.querySelector<HTMLElement>("#o-msg")!;
-  const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); };
+  const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); if (bad && !signin && !all) count(errKey(s)); };
   if (signin) signIn(body, say); else if (all) list(body, say); else if (id) status(id, body, say); else form(body, say);
 }
 
@@ -149,6 +150,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const q = new URLSearchParams(location.search);
   const cart: Cart = { wedgie: 0, kit: 0 };
   if (q.get("item") === "kit") cart.kit = 1; else cart.wedgie = 1;
+  count("view");
   box.innerHTML = `
     <div class="safe-box recess" id="o-cart">
       ${(Object.keys(ITEMS) as Item[]).map((k) => `
@@ -203,13 +205,16 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     if (d > 0 && left != null && cart.wedgie + cart.kit >= left) return say(`Only ${left} left.`, true);
     if (d > 0 && cart.wedgie + cart.kit >= MAX_BOXES) return say(`Up to ${MAX_BOXES} per order.`, true);
     cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + d));
+    count("cart");
     say("");
     paint();
   })));
   paint();
 
   // A real <form> (never submitted) is what makes browsers offer to fill in the saved address.
-  box.querySelector<HTMLFormElement>("#o-addr")!.onsubmit = (e) => e.preventDefault();
+  const addr = box.querySelector<HTMLFormElement>("#o-addr")!;
+  addr.onsubmit = (e) => e.preventDefault();
+  addr.addEventListener("input", () => count("form"));
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
@@ -233,6 +238,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     return s;
   };
   const go = async (pay: "card" | "usdc", b: HTMLButtonElement) => {
+    count("tap-" + pay);
     const s = shipTo();
     if (!s) return;
     b.disabled = true;
@@ -243,6 +249,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       const r = await api({ cart, sealed, email: s.email, pay, chain: Number(box.querySelector<HTMLSelectElement>("#o-chain")!.value) });
       remember(r.id, { token: r.token, at: Date.now() });
       localStorage.setItem(LAST, s.email);
+      count("made-" + pay);
       location.href = r.url || `/order/${r.id}`;
     } catch (e) { say(msgOf(e), true); b.disabled = false; }
   };
@@ -251,6 +258,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 }
 
 // ---- one order ----
+const WHYNOT = [["price", "Price"], ["time", "Ran out of time"], ["pay", "Couldn't pay"], ["looking", "Just looking"]];
 type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
   tracking: string | null; url?: string; why?: string; left?: number; got?: string };
 
@@ -264,6 +272,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
   }
   const link = `${location.origin}/order/${id}#${token}`;
   let v = null as View | null, busy = false, shown = "", ends = 0;     // ends: when the quote runs out, this clock
+  let asked = false;     // answered "Why not?" (shop/count.ts)
 
   const paint = () => {
     if (!v) return;
@@ -298,8 +307,12 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>`
         + (got == null ? `<p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>` : "");
     }
-    if (v.status === "expired" && !got) h += `<p><b>Time ran out.</b> Nothing was charged.</p>
-      <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>`;
+    if (v.status === "expired" && !got) {
+      count("expired");
+      h += `<p><b>Time ran out.</b> Nothing was charged.</p>
+      <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>
+      <p class="fine o-why">${asked ? "Thanks." : `Didn't buy? Why: ${WHYNOT.map(([k, t]) => `<button class="btn btn-sm" data-why="${k}">${t}</button>`).join(" ")}`}</p>`;
+    }
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
     if (v.status === "shipped") h += `<p class="good"><b>Shipped.</b> Your address is deleted.</p>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
@@ -319,8 +332,13 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     };
     const send = box.querySelector<HTMLButtonElement>("#o-send");
     if (send) send.onclick = () => payWallet().catch((e) => { busy = false; paint(); say(msgOf(e), true); });
+    box.querySelectorAll<HTMLButtonElement>("[data-why]").forEach((b) => (b.onclick = () => {
+      count("why-" + b.dataset.why); asked = true;
+      box.querySelector(".o-why")!.textContent = "Thanks.";
+    }));
     const renew = box.querySelector<HTMLButtonElement>("#o-renew");
     if (renew) renew.onclick = async () => {
+      count("renew");
       busy = true; paint();
       try { v = await api({ id, token, renew: true }); if (v!.left != null) ends = Date.now() + v!.left; say(""); watch(); }
       catch (e) { say(msgOf(e), true); }
@@ -355,6 +373,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
   };
 
   async function payWallet() {
+    count("wallet");
     if (!eth()) throw new Error("No wallet in this browser. Send it from any wallet and paste the transaction below.");
     const c = PAY_CHAINS[v!.chain!];
     busy = true; paint();

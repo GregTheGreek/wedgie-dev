@@ -10,6 +10,7 @@
 //   5. orders.py list opens the address (a test key made here); ship marks it shipped and the site forgets it
 //   6. /api/admin refuses without the token; the deposits sweep to the Safe; a sweep before it's paid hides nothing
 //   7. stock: never set = sold out; orders.py stock N; a cart bigger than what's left is refused; 0 = sold out
+//   8. checkout counts (api/count.ts): steps and errors counted, anything off the list dropped
 // Needs anvil, ALCHEMY_API_KEY (or BASE_RPC) to fork from, uv or python3 with `cryptography`, Node 23+.
 // No SHOP_DATABASE_URL_DEV in .env? It runs on an in-memory Postgres (tools/neonlite.mjs).
 // Run: node tools/shopprobe.mjs [outdir]
@@ -214,6 +215,12 @@ ok((await bal(D.depositOf(PAY_TO, early.id))) === 0n, "swept before it was paid"
 const seen = await api({ id: early.id, token: early.token });
 ok(seen.got === "20000000" && seen.status === "new", `the order still counts the 20 USDC sent (got ${seen.got})`);
 py("cancel", early.id);
+
+// 5d: checkout counts (src/shop/count.ts): the steps taken above, off-list keys dropped, nothing else kept
+await fetch(SITE + "/api/count", { method: "POST", body: "probe@example.com" });
+const fun = await (await fetch(SITE + "/api/admin?funnel=1", { headers: { authorization: "Bearer " + ADMIN } })).json();
+const ks = new Set(fun.counts.map((c) => c.k));
+ok(["view", "form", "tap-usdc", "made-usdc", "wallet", "err-only-left"].every((k) => ks.has(k)) && !ks.has("probe@example.com"), `checkout counts: ${[...ks].join(" ")}`);
 
 // 6
 ok((await fetch(SITE + "/api/admin")).status === 401 && (await fetch(SITE + "/api/admin", { headers: { authorization: "Bearer x" } })).status === 401, "/api/admin needs the token");

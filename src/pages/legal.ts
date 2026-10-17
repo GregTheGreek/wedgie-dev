@@ -4,7 +4,7 @@
 export const SELLER = "BuidlGuidl DAO LLC";
 const ADDR = "3307 S College Ave Unit 104, Fort Collins, CO 80525";
 const MAIL = "wedgie@buidlguidl.com";
-const UPDATED = "October 15, 2026";
+const UPDATED = "October 16, 2026";
 
 const TERMS = `
 <h1>Terms of Sale</h1>
@@ -68,7 +68,7 @@ const PRIVACY = `
 <p>The site talks to a wedgie only after you tap Connect, and only in your browser. Nothing about your wedgie or its keys is sent to us.</p>
 
 <h2>Cookies</h2>
-<p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer.</p>
+<p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you.</p>
 
 <p>Questions or a request to delete: <a href="mailto:${MAIL}">${MAIL}</a></p>`;
 

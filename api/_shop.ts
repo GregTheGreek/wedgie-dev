@@ -3,6 +3,7 @@
 // a key only the shipping computer has. This code can't read an address and never tries. Once a box
 // ships, the sealed address, the payer and the payment links are wiped; the rest goes 30 days later.
 // Also a keyed hash of the buyer's IP (ipOf), for OPEN_MAX; wiped after a day. Their email: _mail.ts.
+// And checkout counts (api/count.ts): a number per day per step, about no one.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
@@ -55,6 +56,7 @@ export async function db() {
     await sql`alter table links add column if not exists ip text`;   // ipOf, for login.ts IP_HOUR; gone with the link in a day
     await sql`alter table orders add column if not exists held boolean`;   // unused since 10-15 (dust could lock the stock)
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
+    await sql`create table if not exists counts (day date not null, k text not null, n int not null, primary key (day, k))`;   // api/count.ts: checkout steps, no one in them
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
