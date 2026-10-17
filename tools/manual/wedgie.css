@@ -28,7 +28,7 @@ section { break-inside: avoid; margin-bottom: 14px; }
 .qrbox svg { width: 1.2in; height: 1.2in; flex-shrink: 0; }
 .qrbox p { margin: 0; font-size: 13pt; }
 .qrbox p { margin: 3px 0; font-size: 11pt; }
-.qrbox .big { font-size: 13.5pt; font-weight: 900; }
+.qrbox .big { font-size: 15pt; font-weight: 900; }
 
 /* the front of the wedgie, labeled */
 .front { height: 1.85in; width: auto; display: block; margin: 0 auto 6px; }
