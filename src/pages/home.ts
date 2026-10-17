@@ -147,7 +147,23 @@ export function home(main: HTMLElement): Promise<unknown> {
     <a class="btn btn-lg" href="/code">Create software</a>
     <a class="btn btn-lg" href="/safe">Safe</a>
   </section>
+
+  <section id="demo" class="sec">
+    <div class="sec-head">
+      <span class="kicker">Demo</span>
+      <h2>Signing a Safe on slop.computer.</h2>
+      <p>One of the first demos: two wedgies sign Gnosis Safe transactions, live. <a href="https://slop.computer/jchaskin22?t=2854" target="_blank" rel="noopener">Watch on slop.computer</a></p>
+    </div>
+    <div class="card demo">
+      <video id="demo-video" controls playsinline preload="none"
+        poster="https://media.slop.computer/ipfs/QmQF8KKDLKUk1LTXQkpSB4YEaYzSM6tVSd4uYmsMowGVTz"
+        src="https://media.slop.computer/ipfs/QmUVe3ouGbSix8WmHsqGcwZpohYp7tyt58iQXPAfRxPPuF?filename=jchaskin22.mp4#t=2854"></video>
+    </div>
+  </section>
 `;
+  // The slop.computer episode is 3.4 GB: nothing loads till Play, and it starts at the wedgie part (47:34).
+  const demo = main.querySelector<HTMLVideoElement>("#demo-video")!;
+  demo.addEventListener("loadedmetadata", () => { if (demo.currentTime < 2854) demo.currentTime = 2854; }, { once: true });
 
   const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, intro: true, eager: true, side: 1, fallback: { kind: "off" } });
 
