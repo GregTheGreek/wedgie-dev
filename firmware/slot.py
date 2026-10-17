@@ -311,6 +311,14 @@ def ask(job="", checked=False, v=""):
     return ok
 
 
+def _older(v):
+    """True if version v is older than this wedgie, or not a version at all ("abc", none)."""
+    try:
+        return tuple(int(x) for x in str(v).split(".")) < tuple(int(x) for x in W.VERSION.split("."))
+    except ValueError:
+        return True
+
+
 def _job(mid, m):
     """A checked install: ask (from code already loaded: the question is up at once), and on a yes save
     the job and restart into install mode (wedgie.save_job, main.py, job.resume): job.py then runs on a
@@ -321,6 +329,9 @@ def _job(mid, m):
     v = m.get("version")
     if not v and "release" in m:
         v = str(m["release"]).split("\n")[1][8:]
+    if _older(v):                       # never asked: an old signed list puts back an old core and its holes
+        W.send({"id": mid, "type": "error", "error": "older than this wedgie: %s" % v})   # (job.check holds the signed one too)
+        return False
     if not ask(title, True, v):
         W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
         return False

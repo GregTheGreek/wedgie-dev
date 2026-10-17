@@ -47,8 +47,11 @@ read = lambda n: APPS[n] if n in APPS else open(os.path.join(FW, n), "rb").read(
 names = sorted([n for n in os.listdir(FW) if n.endswith((".py", ".mpy", ".bin")) and not (n.endswith(".py") and os.path.exists(os.path.join(FW, n[:-3] + ".mpy")))] + list(APPS))
 
 
+VER = ["9.9.9"]                          # the signed list's version: older than W.VERSION is refused
+
+
 def release(apps=True):
-    t = "wedgie-release 1\nversion 9.9.9\n" + "".join("%s  %s\n" % (sha(read(n)), n) for n in names)
+    t = "wedgie-release 1\nversion %s\n" % VER[0] + "".join("%s  %s\n" % (sha(read(n)), n) for n in names)
     if apps:
         for c in sorted(carts, key=lambda c: c["mod"]):
             a = {"mod": c["mod"], "name": c["name"], "files": c["files"]}
@@ -106,7 +109,7 @@ def run(job_msg, msgs, rel_apps=True, app="hello"):
         W.lines = lambda size=6144: h
         W.send = lambda o: h.out.append(o)
         try:
-            job.run(1, dict(job_msg, type="job", version="9.9.9"), lambda *a: True)
+            job.run(1, dict(job_msg, type="job", version=VER[0]), lambda *a: True)
         except SystemExit:
             h.out.append({"type": "reset"})
         files = {n: open(n, "rb").read() for n in os.listdir(".") if os.path.isfile(n)}
@@ -234,6 +237,15 @@ check(f.get("slot.mpy") == read("slot.mpy") and "done" not in types_(out), "raw 
 out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
              [{"type": "put", "name": "slot.mpy", "n": -1, "end": True}, {"type": "commit"}])
 check("done" not in types_(out), "a raw put with n -1: refused (%s)" % types_(out))
+
+VER[0] = "0.3.47"                       # an old signed list puts back an old core with its holes (audit 10-16)
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             raw_puts("slot.mpy", big) + [{"type": "commit"}])
+check("done" not in types_(out) and "older" in str(out), "a signed list older than this wedgie: refused (%s)" % out[-1:])
+VER[0] = W.VERSION
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             raw_puts("slot.mpy", big) + [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"], "a signed list of this wedgie's own version goes in: %s" % types_(out))
 
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)

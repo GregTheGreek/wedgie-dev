@@ -20,10 +20,12 @@ def stuck(e):
     except Exception:
         pass
     sys.print_exception(e)
+    drew = False        # not drawn: the screen may still show the app's page (Safe's "sign"), so green means nothing
     try:
         import lcd, ui
         d = lcd.LCD()
         ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("{g} full control", ui.INK), ("{k} try again", ui.INK)])
+        drew = True
     except Exception:
         pass
     from machine import Pin
@@ -36,13 +38,13 @@ def stuck(e):
     while a.value() == 0 or b.value() == 0:
         time.sleep_ms(20)
     while True:
-        if a.value() == 0:
-            try:            # the escape hatch's red question (hatch.py). If it can't even draw, green on "wedgie broke" stands
+        if a.value() == 0 and drew:
+            try:            # the escape hatch's red question (hatch.py). If it can't draw, no: BOOTSEL is the way back
                 if not ui.ask(d, "FULL CONTROL?", ["This computer could run any code and make the chip sign anything: send your money.",
                                                    "Didn't ask? Press {r}"], yes="full control", no="no", scary=True):
                     return False
             except Exception:
-                pass
+                return False
             try:
                 import wedgie
                 wedgie.set_open()

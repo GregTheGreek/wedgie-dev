@@ -64,6 +64,10 @@ def rules(m):
             raise ValueError("a job puts on one app at most")
 
 
+def _ver(v):
+    return tuple(int(x) for x in v.split("."))
+
+
 def check(m, sig=True, tick=None):
     """The job against its signed list: (version, {name: sha}) or raises ValueError. sig=False skips the
     signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes.
@@ -76,6 +80,8 @@ def check(m, sig=True, tick=None):
     if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "", tick)):
         raise ValueError("not signed by wedgie.dev")
     version, files = W.release_files(rel)
+    if _ver(version) < _ver(W.VERSION):  # an old signed list puts back an old core and its holes (audit 10-16:
+        raise ValueError("older than this wedgie: %s" % version)   # 0.3.47's boot.py let a host in, still signed)
     rules(m)
     signed = W.release_apps(rel)
     if signed:                          # (a list from before 0.3.12 has none: files only, as then)

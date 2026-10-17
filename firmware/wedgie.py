@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.48"
+VERSION = "0.3.49"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -11,8 +11,9 @@ VERSION = "0.3.48"
 # A says yes). Yes turns Ctrl-C back on for ONE job: the next time main.py starts (the soft reset or
 # exec(main.py) every host does when it's done) it's locked again. Nothing is kept across a restart
 # on purpose: "until unplugged" (a watchdog scratch register, 0.2.5-0.2.6) stayed open on a real
-# wedgie long after the job. SEALED stays False where main.py doesn't run (the emulator).
-SEALED = False
+# wedgie long after the job. SEALED is False only off a real chip (the emulator): on one it starts locked, so
+# a main.py that failed before its "SEALED = True" fails closed (audit 10-16: it failed open).
+SEALED = sys.platform == "rp2"
 _open = False
 
 # The release key (tools/sign.mjs writes it here): a file list signed with it is ours. A checked install

@@ -317,12 +317,20 @@ try {
   // a no to a job: refused, then it starts again from the top
   await page.waitForTimeout(2000);
   const nob = page.evaluate(() => new Promise((res) => { const got = []; const off = window.vw.onOutput((l) => { if (/"refused"|"ready"/.test(l)) got.push(l.includes("refused") ? "refused" : "ready"); if (got.length >= 2) { off(); res(got); } }); setTimeout(() => { off(); res(got); }, 15000); }));
-  await page.evaluate(() => window.vw.write(JSON.stringify({ id: 91, type: "job", job: "Install Hello", version: "x", write: ["hello.py"], delete: [], apps: null }) + "\n"));
+  await page.evaluate((v) => window.vw.write(JSON.stringify({ id: 91, type: "job", job: "Install Hello", version: v, write: ["hello.py"], delete: [], apps: null }) + "\n"), ver);
   await page.waitForTimeout(1500);
   await page.evaluate(() => window.vw.press("Y", 150));
   const nj = await nob;
   check(nj.join(" ") === "refused ready", `job + Y: refused, then it restarts (${nj.join(" ")})`);
   await page.waitForTimeout(2000);
+
+  // an older version (a downgrade, audit 10-16) or junk: refused at once, nobody is asked
+  for (const [i, v] of [["0.3.1", "0.3.1"], ["junk", "abc"]]) {
+    const r = await req({ id: 95, type: "job", job: "Update firmware", version: v, write: ["main.py"], delete: [], apps: null }, 3000);
+    check(r?.type === "error" && /older than this wedgie/.test(r.error || ""), `job ${i} (${v}): refused, no question (${JSON.stringify(r)})`);
+  }
+  const still = await req({ id: 96, type: "sums", names: [], exists: ["hello.py"] });
+  check(still?.type === "sums", `after a refused downgrade it still answers (${JSON.stringify(still)})`);
 
   // installs free the RAM an app left behind first (install.ts FREE_PY): only lcd stays, and code after it
   // imports what it needs
