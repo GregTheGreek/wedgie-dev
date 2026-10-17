@@ -19,3 +19,8 @@ const errs = Object.keys(tot).filter((k) => k.startsWith("err-")).sort((a, b) =>
 if (errs.length) { console.log("\nerrors"); errs.forEach(row); }
 console.log("\norders");
 for (const o of r.orders) console.log(String(o.n).padStart(6), o.pay, o.status);
+if (r.canceled?.length) {
+  console.log("\ncanceled");
+  const d = (t) => (t ? t.slice(0, 16).replace("T", " ") : "-");
+  for (const o of r.canceled) console.log(` ${o.id} ${o.pay.padEnd(4)} $${(o.cents / 100).toFixed(2).padStart(7)}  made ${d(o.created)}  paid ${d(o.paid_at)}  canceled ${d(o.canceled_at)}`);
+}

@@ -3,7 +3,7 @@
 //   POST {id, tracking}          shipped: the buyer gets an email with the tracking number; then the sealed address,
 //                                their locked email, payer, transaction and Stripe session are wiped
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
-//   GET ?funnel=1                the checkout counts (api/count.ts) and orders by pay and status, last `days` (30)
+//   GET ?funnel=1                the checkout counts (api/count.ts) and orders by pay and status, last `days` (30); every canceled order
 //   POST {stock: n}              n boxes left to sell from now on (_shop.ts stockLeft); 0 = sold out
 // Each GET also marks paid the USDC orders whose deposit address now holds their price, and deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
 import { db, env, json, oops, same, settleDeposit, stockLeft, type Order } from "./_shop.js";
@@ -22,7 +22,8 @@ export async function GET(req: Request) {
     const days = Math.max(1, Math.min(365, Number(q.get("days")) || 30));
     const counts = await sql`select day::text, k, n from counts where day > current_date - ${days}::int order by day, k`;
     const orders = await sql`select pay, status, count(*)::int as n from orders where created > now() - ${days + " days"}::interval group by pay, status order by pay, status`;
-    return json({ days, counts, orders });
+    const canceled = await sql`select id, pay, cents, cart, created, paid_at, shipped_at as canceled_at from orders where status = 'canceled' order by created`;
+    return json({ days, counts, orders, canceled });
   }
   // The shipped boxes deleted here come off the stock count too, so stockLeft doesn't forget them and hand them out again.
   await sql`with gone as (delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
