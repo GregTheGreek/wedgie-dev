@@ -324,10 +324,13 @@ try {
   check(nj.join(" ") === "refused ready", `job + Y: refused, then it restarts (${nj.join(" ")})`);
   await page.waitForTimeout(2000);
 
-  // an older version (a downgrade, audit 10-16) or junk: refused at once, nobody is asked
+  // an older version (a downgrade, audit 10-16) or junk: refused at once, nobody is asked; it starts again as after a no
   for (const [i, v] of [["0.3.1", "0.3.1"], ["junk", "abc"]]) {
+    const up = page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes('"ready"')) { off(); res(true); } }); setTimeout(() => { off(); res(false); }, 15000); }));
     const r = await req({ id: 95, type: "job", job: "Update firmware", version: v, write: ["main.py"], delete: [], apps: null }, 3000);
     check(r?.type === "error" && /older than this wedgie/.test(r.error || ""), `job ${i} (${v}): refused, no question (${JSON.stringify(r)})`);
+    check(await up, `job ${i}: then it starts again`);
+    await page.waitForTimeout(1000);
   }
   const still = await req({ id: 96, type: "sums", names: [], exists: ["hello.py"] });
   check(still?.type === "sums", `after a refused downgrade it still answers (${JSON.stringify(still)})`);
