@@ -66,7 +66,7 @@ export const STEPS: Step[] = [
     p: `Some Picos have a little extra board left on the end, away from the USB-C. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,
     d: "11p", ph: ["11-snap-off-tab", "11-picos-with-tabs"] },
   { t: "Cut off plastic guards",
-    p: `We don't recommend a Pico 2 W: a hardware wallet shouldn't have WiFi. Got one anyway? Flip it over. It probably has 3 black plastic guards across the back. Cut off the middle one and the one away from the USB with clippers. Keep the one at the USB end and the plastic along the pins.`,
+    p: `We don't recommend a Pico 2 W: a hardware wallet shouldn't have WiFi. Got one anyway? Flip it over. It probably has 3 black plastic guards across the back. Cut off the middle one and one end one with clippers. Keep the plastic along the pins.`,
     d: "11g", ph: ["11-guards", "11-guards-end", "11-guards-cut", "11-guards-cut-parts"],
     warn: `You have to. With the guards on, the Trust M can't wedge in.` },
   { t: "Stack the boards",
