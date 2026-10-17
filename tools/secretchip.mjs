@@ -5,6 +5,8 @@
 //     app answers its error there: anything but a crash).
 //  2. No app, the REPL: secret_box.py opens that message on real MicroPython (cryptolib AES, its HMAC),
 //     given the ECDH secret Node works out, and the reader draws it.
+//  3. Chat, in the REPL with the chip's ECDH and the press played: a named sender asks once, their next
+//     message shows with no ask, a nameless one always asks, red closes the chat.
 // A MemoryError, a traceback that isn't the chip's, or no answer fails it. Prints the least free heap seen.
 //   node tools/secretchip.mjs [--app <wedgie-secret checkout>] [--shots <dir>]   (default: the shelf's copy; until it is on the shelf, pass --app)
 // Needs uv (the flash image: littlefs-python).
@@ -127,11 +129,45 @@ print(binascii.hexlify(hashlib.sha256(m).digest()).decode(), f0, gc.mem_free())
     };
     shot(`import lcd, ui, secret
 secret.d = lcd.LCD()
-secret.READ_MS = 1
-secret.read(secret.text_lines(m))`, "secret-read.png");
+secret.chat = {"from": "Bob", "lines": secret.text_lines(m), "at": 0, "t0": 0}
+secret.draw_chat()`, "secret-read.png");
     shot(`ui.ask(secret.d, "Read a secret?", (), "read", "no", 1)`, "secret-ask.png");
     console.log(`     shots in ${shots}`);
   }
+}
+{ // 3. chat
+  const h = host({ fs: image(F, null, Object.fromEntries(cart.files.map((n) => [n, F.file(n)])), ["main.py"]) });
+  h.until((b) => b.includes(">>> "), 30000, 20);
+  const r = h.exec(`import gc, binascii, lcd, ui, secret
+secret.d = lcd.LCD()
+secret.key = ${JSON.stringify(key)}
+secret.ecdh = lambda e: binascii.unhexlify(${JSON.stringify(hex(z))})
+asks = []
+ui.ask = lambda d, q, *a, **k: asks.append(q) or True
+ui.progress = lambda *a, **k: None
+b = ${JSON.stringify(blob)}
+gc.collect()
+f0 = gc.mem_free()
+secret.on_open(1, b, "Bob")
+one = (len(asks), secret.chat["from"], len(secret.chat["lines"]))
+secret.draw_chat()
+secret.on_open(2, b, "Bob")
+two = len(asks)
+secret.on_open(3, b, "")
+three = len(asks)
+secret.chat_key("down")
+pg = secret.chat["at"]
+secret.chat_key("Y")
+gc.collect()
+print("RES", one[0], one[1], one[2], two, three, pg, secret.chat is None, f0 - gc.mem_free(), asks[0])
+`, 60000);
+  const m = r.match(/RES (.*)/);
+  const [a1, from, lines, a2, a3, pg, closed, used, ...q] = m ? m[1].trim().split(" ") : [], q0 = q.join(" ");
+  if (!m) console.log("     it said:", JSON.stringify(r.slice(-600)));
+  check(a1 === "1" && from === "Bob" && Number(lines) > 10, `chat: Bob's first message asks once ("${q0}"), ${lines} lines on screen`);
+  check(a2 === "1", "chat: Bob's next message shows with no ask");
+  check(a3 === "2", "chat: a message with no name always asks");
+  check(pg === "1" && closed === "True", `chat: down pages, red closes it (${used} B held after)`);
 }
 console.log(`     least free heap seen with the app running: ${least} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");

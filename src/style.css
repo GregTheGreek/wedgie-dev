@@ -745,3 +745,8 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .legal-page h1 { font-size: 28px; color: var(--ink, #1a1b1a); letter-spacing: 0; text-transform: none; margin: 16px 0 4px; }
 .legal-page h2 { font-size: 19px; margin: 26px 0 6px; }
 .legal-page p { line-height: 1.55; margin: 0 0 10px; }
+.chat-msgs { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.chat-in, .chat-out { max-width: 80%; padding: 8px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 2px; }
+.chat-in { align-self: flex-start; background: var(--shell); box-shadow: var(--shell-shadow); }
+.chat-out { align-self: flex-end; background: var(--green-fill); color: #fff; white-space: pre-wrap; word-break: break-word; }
+.chat-in i, .chat-out i { font-size: 12px; font-style: normal; opacity: .7; }
