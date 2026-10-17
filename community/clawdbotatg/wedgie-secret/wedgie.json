@@ -1,0 +1,31 @@
+{
+  "apps": [
+    {
+      "mod": "secret",
+      "name": "Secrets",
+      "about": "Messages only your wedgie can read. Paste one at wedgie.dev/secret: it opens on the wedgie's screen, never the computer's.",
+      "files": [
+        "secret.py",
+        "secret_box.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.17",
+      "usb": true,
+      "label": "#7a5cff",
+      "icon": [
+        "............",
+        "....kkkk....",
+        "...k....k...",
+        "...k....k...",
+        "..kkkkkkkk..",
+        "..kyyyyyyk..",
+        "..kyyykyyk..",
+        "..kyykkkyk..",
+        "..kyyykyyk..",
+        "..kyyyyyyk..",
+        "..kkkkkkkk..",
+        "............"
+      ]
+    }
+  ]
+}

@@ -266,6 +266,15 @@
       "v": {
         "blackjack": "e6816fb56ac7"
       }
+    },
+    {
+      "repo": "clawdbotatg/wedgie-secret",
+      "sha": "58e5cd899cfefcc5bc3117f4ff88e02e47abf0fa",
+      "at": "2026-10-15T03:34:05Z",
+      "approved": "2026-10-17",
+      "v": {
+        "secret": "126134af64ab"
+      }
     }
   ]
 }

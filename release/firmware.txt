@@ -33,6 +33,8 @@ f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 b79471ff84c03737bc243f1726c5cb36cc1bec0ab51e427dbf4be2416e979c46  safe_read.py
 3024f60d440b2494fdc24d7dc374e5e435de2d424168fa237c46b9c999c4194a  save.mpy
+bea003efc64592b8746d6e2c69519af02ca31cdec699223fbd55ac1717b5578a  secret.py
+0dab883dbbf4b484759911880face307a66e1226474a95d47a29bc723972cab1  secret_box.py
 9557064e577990471fa54c0482a5ac08983a0c5dee90ef4dd51c4e0e148360ee  slot.mpy
 5b410a845d8a8d7a186fd4113cbcf5cd5a4e32337ffa8d28421d356400f8530b  small.mpy
 73c45ef2c4b60e84e1109a30790837676a035f1dc0983ad53e5c93c03f6857d9  splash.mpy
@@ -50,3 +52,4 @@ b79471ff84c03737bc243f1726c5cb36cc1bec0ab51e427dbf4be2416e979c46  safe_read.py
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
+@app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
