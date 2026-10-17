@@ -291,6 +291,15 @@
           }
         }
       ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-welcome",
+      "sha": "4a36dfb6ddde947d9e6b42c4323c2bbe7cb27175",
+      "at": "2026-10-17T18:46:17Z",
+      "approved": "2026-10-17",
+      "v": {
+        "welcome": "353d79f78b81"
+      }
     }
   ]
 }

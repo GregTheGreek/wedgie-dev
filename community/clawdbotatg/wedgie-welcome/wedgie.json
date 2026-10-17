@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "welcome",
+      "name": "Welcome",
+      "about": "What a new wedgie plays: a little guy on a stage you walk around, a slideshow behind him about the wedgie and what's inside this one.",
+      "files": [
+        "welcome.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.24",
+      "label": "#e3312c",
+      "icon": [
+        "............",
+        ".gggggggggg.",
+        ".ssssssssss.",
+        ".rrrrrrrrrr.",
+        ".wwwwwwwwww.",
+        ".kwwwwwwwwk.",
+        "..kwwwwwwk..",
+        "...kwwwwk...",
+        "....kwwk....",
+        ".....kk.....",
+        "............",
+        "............"
+      ]
+    }
+  ]
+}
