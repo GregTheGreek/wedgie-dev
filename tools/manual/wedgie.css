@@ -18,8 +18,9 @@ section { break-inside: avoid; margin-bottom: 14px; }
 
 /* cover */
 .cover { margin: 0 0 12px; }
+.cover .kick { text-align: center; }
 .kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 11pt; }
-.cover h1 { font-size: 38pt; margin: 4px 0 6px; }
+.cover h1 { font-size: 34pt; text-align: center; margin: 0.45in 0 0.55in; }
 .cover .lede { font-size: 12.5pt; color: #474947; margin: 0 0 10px; }
 .cover .row { display: flex; gap: 16px; align-items: center; }
 .cover .hero img { height: 2.2in; border-radius: 14px; display: block; }
@@ -31,15 +32,16 @@ section { break-inside: avoid; margin-bottom: 14px; }
 .qrbox .big { font-size: 15pt; font-weight: 900; }
 
 /* the front of the wedgie, labeled */
-.front { height: 1.85in; width: auto; display: block; margin: 0 auto 6px; }
+.front { height: 1.6in; width: auto; display: block; margin: 0 auto 6px; }
 .front .lbl { font: 800 12px "Nunito"; fill: #1a1b1a; }
 .front .sub { font: 600 10.5px "Nunito"; fill: #6b6e6b; }
 .front .lbl.big { font-size: 15px; font-weight: 900; }
 .front .scr { font-family: "DM Mono", monospace; font-weight: 700; fill: #1a1b1a; }
 .front .ln { stroke: #b9bab6; stroke-width: 1.2; fill: none; }
 
-.cols { columns: 2; column-gap: 24px; break-before: page; font-size: 10pt; }
+.cols { columns: 2; column-gap: 24px; font-size: 10pt; }
 .cols h2 { font-size: 14pt; }
+.cols .col { break-before: column; }
 .cols section { margin-bottom: 10px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
 .note { font-size: 10pt; padding: 8px 12px; border-radius: 10px; background: #eeeeea; border-left: 5px solid #22c452; }
