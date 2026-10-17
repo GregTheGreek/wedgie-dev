@@ -276,12 +276,21 @@
     },
     {
       "repo": "clawdbotatg/wedgie-secret",
-      "sha": "58e5cd899cfefcc5bc3117f4ff88e02e47abf0fa",
-      "at": "2026-10-15T03:34:05Z",
+      "sha": "2fa02391a5369aa651cf2bdab690d82d257d46b8",
+      "at": "2026-10-17T03:31:48Z",
       "approved": "2026-10-17",
       "v": {
-        "secret": "126134af64ab"
-      }
+        "secret": "0634c56b15f5"
+      },
+      "past": [
+        {
+          "sha": "58e5cd899cfefcc5bc3117f4ff88e02e47abf0fa",
+          "at": "2026-10-15T03:34:05Z",
+          "v": {
+            "secret": "126134af64ab"
+          }
+        }
+      ]
     }
   ]
 }

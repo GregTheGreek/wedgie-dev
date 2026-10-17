@@ -10,11 +10,15 @@
 # key that may do ECDH). The public key is saved (/saves/secret/key) because the Trust M hands it out only
 # when it makes the key. The message format: secret_box.py.
 #
+# Chat: a press opens a chat with one sender ("from", a name); while it's open, that sender's next messages
+# show with no press. Red closes it, and so do CHAT_MS with nothing new. Messages only ever go to the screen.
+#
 # USB (one JSON line each way; everything else goes to the slot, so hello/shot/jobs still work):
-#   {"id":1,"type":"secret_open","blob":"wedgie1...."}
-#   -> {"id":1,"type":"secret_shown"}: it's on the wedgie's screen now (Y closes it)
-#   -> {"id":1,"type":"refused"} (Y, or no answer in 2 minutes) or {"type":"error","error":".."}
+#   {"id":1,"type":"secret_open","blob":"wedgie1....","from":"Alice"}   (from: optional)
+#   -> {"id":1,"type":"secret_shown","chat":true}: it's on the wedgie's screen now (red closes it)
+#   -> {"id":1,"type":"refused"} (red, or no answer in 2 minutes) or {"type":"error","error":".."}
 #      ("not for this wedgie": another key's message, or changed on the way)
+#   {"id":2,"type":"secret_close"} -> {"id":2,"type":"closed"}: the screen goes back home, the chat ends
 #   hello answers also carry "secret": {"pub":"04..","chip":"..","id":"a1b2 c3d4"} (or null: no key yet).
 #   id is the first 4 bytes of sha256(pub): the wedgie's screen shows it, so a sender can check the key.
 import sys, select, json, time, gc, binascii, hashlib
@@ -24,9 +28,9 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, RED
 
-FW = "secret-1"
+FW = "secret-2"
 ASK_MS = 120000
-READ_MS = 300000        # a message left open closes itself after 5 minutes
+CHAT_MS = 300000        # a chat with nothing new closes itself after 5 minutes
 ROWS = 10               # message lines on one screen
 COLS = ui.COLS_SMALL
 
@@ -36,6 +40,7 @@ _poll = None
 key = None              # {"pub": "04..", "chip": "ATECC608" | "OPTIGA Trust M", "id": "a1b2 c3d4"} or None
 note = ""
 dirty = True
+chat = None             # the open chat: {"from": name, "lines": [...], "at": page, "t0": ticks of the last message}
 
 
 def key_id(pub):
@@ -151,38 +156,38 @@ def text_lines(m):
     return out
 
 
-def read(lines):
-    """The message on the screen until Y (or READ_MS), a screen at a time: down for the next, up back."""
-    k = L.Keys(physical=True)
-    k.pressed()
-    n = (len(lines) + ROWS - 1) // ROWS
-    at, t0 = 0, time.ticks_ms()
-    while time.ticks_diff(time.ticks_ms(), t0) < READ_MS:
-        d.fill(WHITE)
-        ui.band(d)
-        ui.title(d, "Secret", 42, 1)
-        for i, s in enumerate(lines[at * ROWS:at * ROWS + ROWS]):
-            d.text(s, 8, 74 + i * 14, INK)
-        ui.say(d, "{r} close" + ("  up/down %d/%d" % (at + 1, n) if n > 1 else ""), 222, MUTED)
-        d.show()
-        moved = False
-        while not moved and time.ticks_diff(time.ticks_ms(), t0) < READ_MS:
-            for kk in k.pressed():
-                if kk == "Y":
-                    return
-                if kk == "down" and at + 1 < n:
-                    at, moved = at + 1, True
-                elif kk == "up" and at:
-                    at, moved = at - 1, True
-            time.sleep_ms(20)
-        if moved:
-            t0 = time.ticks_ms()
+def draw_chat():
+    """The newest message, a screen at a time: down for the next, up back."""
+    lines, at = chat["lines"], chat["at"]
+    n = max(1, (len(lines) + ROWS - 1) // ROWS)
+    d.fill(WHITE)
+    ui.band(d)
+    ui.title(d, chat["from"][:COLS] or "Secret", 42, 1)
+    for i, s in enumerate(lines[at * ROWS:at * ROWS + ROWS]):
+        d.text(s, 8, 74 + i * 14, INK)
+    ui.say(d, "{r} close" + ("  up/down %d/%d" % (at + 1, n) if n > 1 else ""), 222, MUTED)
+    d.show()
+
+
+def chat_key(k):
+    """A press while a chat is open. True: the screen changed."""
+    global chat
+    n = (len(chat["lines"]) + ROWS - 1) // ROWS
+    if k == "Y":
+        chat = None
+    elif k == "down" and chat["at"] + 1 < n:
+        chat["at"] += 1
+    elif k == "up" and chat["at"]:
+        chat["at"] -= 1
+    else:
+        return False
+    return True
 
 
 # ---- requests ---------------------------------------------------------------------------------
 
-def on_open(mid, blob):
-    global note
+def on_open(mid, blob, frm):
+    global note, chat
     if not key:
         W.send({"id": mid, "type": "error", "error": "no key yet: press green on the wedgie to make one"})
         return
@@ -194,11 +199,14 @@ def on_open(mid, blob):
         return
     blob = None
     gc.collect()
-    if not ui.ask(d, "Read a secret?", (), "read", "no", ASK_MS):
+    frm = frm[:COLS] if isinstance(frm, str) else ""
+    asked = not chat or not frm or chat["from"] != frm      # a message with no name always asks
+    if asked and not ui.ask(d, "Chat with %s?" % frm if frm else "Read a secret?", (), "read", "no", ASK_MS):
         note = "said no"
         W.send({"id": mid, "type": "refused"})
         return
-    ui.progress("Opening", "in the chip", False)
+    if asked:
+        ui.progress("Opening", "in the chip", False)
     try:
         m = B.open_box(ecdh(e), e, binascii.unhexlify(key["pub"]), iv, ct, tag)
     except ValueError as x:
@@ -209,18 +217,23 @@ def on_open(mid, blob):
         del sys.modules["secret_box"]
         e = iv = ct = tag = None
         gc.collect()
-    lines = text_lines(m)
+    chat = None
+    gc.collect()
+    chat = {"from": frm, "lines": text_lines(m), "at": 0, "t0": time.ticks_ms()}
     m = None
     note = ""
-    W.send({"id": mid, "type": "secret_shown"})
-    read(lines)
+    W.send({"id": mid, "type": "secret_shown", "chat": True})
 
 
 def handle(m):
-    global dirty
+    global dirty, chat
     mid, t = m.get("id"), m.get("type")
     if t == "secret_open":
-        on_open(mid, m.get("blob"))
+        on_open(mid, m.get("blob"), m.get("from"))
+        dirty = True
+    elif t == "secret_close":
+        chat = None
+        W.send({"id": mid, "type": "closed"})
         dirty = True
     elif t == "hello":
         W.send(W.hello(mid, running="secret", app=FW, secret=key))
@@ -270,7 +283,7 @@ def pump():
 
 
 def run():
-    global d, keys, _poll, key, dirty, note
+    global d, keys, _poll, key, dirty, note, chat
     d = L.LCD()
     keys = L.Keys(physical=True)
     _poll = select.poll()
@@ -279,7 +292,9 @@ def run():
     W.send(W.hello(None, type="ready", running="secret", app=FW, secret=key))
     while True:
         for k in keys.pressed():
-            if k == "A" and not key:
+            if chat:
+                dirty = chat_key(k) or dirty
+            elif k == "A" and not key:
                 if ui.ask(d, "Make a key?", key_question()):
                     try:
                         make_key()
@@ -289,7 +304,9 @@ def run():
                         note = "no key: %s" % e
                 dirty = True
         pump()
+        if chat and time.ticks_diff(time.ticks_ms(), chat["t0"]) > CHAT_MS:
+            chat, dirty = None, True
         if dirty:
-            draw_home()
+            draw_chat() if chat else draw_home()
             dirty = False
         time.sleep_ms(20)
